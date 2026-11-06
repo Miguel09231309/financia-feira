@@ -1,0 +1,6 @@
+{
+  "name": "FinanZen & Gestão de Feira",
+  "description": "Controle financeiro mensal completo com gráficos de receitas e despesas, orçamentos inteligentes, integração bancária Open Finance, backup seguro na nuvem, exportação de relatórios em PDF e controle completo de recebimentos e pagamentos para feiras.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
