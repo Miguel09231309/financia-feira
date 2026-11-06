@@ -614,16 +614,25 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-900 dark:bg-black text-white">
-                  <th className="sticky left-0 z-20 bg-slate-900 dark:bg-black py-2.5 px-3 text-left font-bold min-w-[195px] border-r border-slate-700 dark:border-neutral-800">
-                    <div className="flex items-center justify-between gap-2">
+                  <th className="sticky left-0 z-20 bg-slate-900 dark:bg-black py-2.5 px-3 text-left font-bold min-w-[215px] border-r border-slate-700 dark:border-neutral-800">
+                    <div className="flex items-center justify-between gap-1.5">
                       <span>Feirante / Barraca</span>
-                      <button
-                        onClick={openNewFeiranteModal}
-                        className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded"
-                        title="Adicionar novo feirante"
-                      >
-                        + Barraca
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={openNewFeiranteModal}
+                          className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded"
+                          title="Adicionar novo feirante"
+                        >
+                          + Barraca
+                        </button>
+                        <button
+                          onClick={() => setShowNewEditionModal(true)}
+                          className="px-1.5 py-0.5 text-[10px] font-semibold bg-sky-600 hover:bg-sky-500 text-white rounded"
+                          title="Adicionar novo dia de feira"
+                        >
+                          + Dia
+                        </button>
+                      </div>
                     </div>
                   </th>
                   {editions.map(ed => (

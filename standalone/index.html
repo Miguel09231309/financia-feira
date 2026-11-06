@@ -546,7 +546,15 @@
                   <table className="w-full border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-900 dark:bg-black text-white">
-                        <th className="sticky left-0 z-20 bg-slate-900 dark:bg-black py-2.5 px-3 text-left font-bold min-w-[200px] border-r border-slate-700 dark:border-neutral-800">Feirante</th>
+                        <th className="sticky left-0 z-20 bg-slate-900 dark:bg-black py-2.5 px-3 text-left font-bold min-w-[215px] border-r border-slate-700 dark:border-neutral-800">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span>Feirante</span>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => { setEditingFr(null); setFrName(''); setFrStall(''); setFrPhone(''); setFrFee('55'); setShowFrModal(true); }} className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded" title="Adicionar barraca">+ Barraca</button>
+                              <button onClick={() => setShowNewEd(true)} className="px-1.5 py-0.5 text-[10px] font-semibold bg-sky-600 hover:bg-sky-500 text-white rounded" title="Adicionar novo dia">+ Dia</button>
+                            </div>
+                          </div>
+                        </th>
                         {editions.map(ed => (
                           <th key={ed.id} className={`py-2 px-2 text-center font-mono min-w-[105px] border-r border-slate-700 dark:border-neutral-800 ${ed.status === 'cancelada' ? 'bg-rose-700' : ''}`}>
                             {editingEdColId === ed.id ? (
