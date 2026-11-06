@@ -244,7 +244,16 @@ export const CloudBackupSecurity: React.FC<CloudBackupSecurityProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <a
+              href="/feira-da-lua.html"
+              download="index.html"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Baixar index.html Autônomo
+            </a>
+
             <button
               onClick={handleDownloadBackupFile}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"

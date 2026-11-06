@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feira da Lua — Gestão Financeira Autônoma</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .font-mono, .tabular-nums {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #fff !important; color: #000 !important; }
+    }
+  </style>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50 dark:bg-black text-slate-900 dark:text-neutral-100 antialiased min-h-screen selection:bg-emerald-500 selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- Inline SVG Icons (100% offline/standalone safe) ---
+    const Icon = ({ children, className = "w-4 h-4" }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {children}
+      </svg>
+    );
+    const PrinterIcon = ({ className }) => <Icon className={className}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></Icon>;
+    const PlusIcon = ({ className }) => <Icon className={className}><path d="M5 12h14"/><path d="M12 5v14"/></Icon>;
+    const TrashIcon = ({ className }) => <Icon className={className}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></Icon>;
+    const PencilIcon = ({ className }) => <Icon className={className}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></Icon>;
+    const MoonIcon = ({ className }) => <Icon className={className}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></Icon>;
+    const SunIcon = ({ className }) => <Icon className={className}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></Icon>;
+    const LockIcon = ({ className }) => <Icon className={className}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
+    const CheckIcon = ({ className }) => <Icon className={className}><path d="M20 6 9 17l-5-5"/></Icon>;
+    const XIcon = ({ className }) => <Icon className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></Icon>;
+    const DownloadIcon = ({ className }) => <Icon className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></Icon>;
+    const UploadIcon = ({ className }) => <Icon className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></Icon>;
+    const ShieldIcon = ({ className }) => <Icon className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></Icon>;
+    const MessageIcon = ({ className }) => <Icon className={className}><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></Icon>;
+
+    // --- Formatters ---
+    const formatCurrency = (value) => {
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+    };
+
+    const formatDateBR = (dateStr) => {
+      if (!dateStr) return '';
+      const parts = dateStr.split('-');
+      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
+    };
+
+    // --- Storage Keys & Seed Data ---
+    const KEYS = {
+      FEIRANTES: 'feiralua_feirantes_v1',
+      EDITIONS: 'feiralua_editions_v1',
+      PARTICIPATIONS: 'feiralua_participations_v1',
+      EXPENSES: 'feiralua_expenses_v1',
+      THEME: 'feiralua_dark_v1',
+      PIN: 'feiralua_pin_v1',
+    };
+
+    const INITIAL_FEIRANTES = [
+      { id: 'fr-1', name: 'Cachorro Quente', stallType: 'Lanches & Hot Dog', phone: '', defaultFee: 55, active: true },
+      { id: 'fr-2', name: 'Pastelaria Sabor', stallType: 'Pastéis & Caldo', phone: '(41) 99812-3401', defaultFee: 55, active: true },
+      { id: 'fr-3', name: 'Espetinho do Zé', stallType: 'Churrasco & Espetos', phone: '(41) 99745-8820', defaultFee: 55, active: true },
+      { id: 'fr-4', name: 'Crepe Francês', stallType: 'Crepes & Massas', phone: '(41) 99123-4567', defaultFee: 55, active: true },
+      { id: 'fr-5', name: 'Açaí & Sorvetes', stallType: 'Sobremesas Geladas', phone: '(41) 99654-1122', defaultFee: 55, active: true },
+      { id: 'fr-6', name: 'Chopp Artesanal', stallType: 'Bebidas & Chopp', phone: '(41) 99888-7766', defaultFee: 72, active: true },
+      { id: 'fr-7', name: 'Milho & Pamonha', stallType: 'Derivados de Milho', phone: '(41) 99234-5678', defaultFee: 55, active: true },
+      { id: 'fr-8', name: 'Doces Mineiros', stallType: 'Confeitaria & Doces', phone: '(41) 99345-6789', defaultFee: 55, active: true },
+      { id: 'fr-9', name: 'Artesanato Local', stallType: 'Arte & Decoração', phone: '(41) 99456-7890', defaultFee: 32, active: true },
+      { id: 'fr-10', name: 'Tapioca Nordestina', stallType: 'Tapiocas & Cuscuz', phone: '(41) 99567-8901', defaultFee: 55, active: true },
+      { id: 'fr-11', name: 'Hambúrguer Artesanal', stallType: 'Burgers na Brasa', phone: '(41) 99678-9012', defaultFee: 72, active: true },
+      { id: 'fr-12', name: 'Batata Recheada', stallType: 'Batatas & Porções', phone: '(41) 99789-0123', defaultFee: 55, active: true },
+      { id: 'fr-13', name: 'Queijos & Embutidos', stallType: 'Laticínios Coloniais', phone: '(41) 99890-1234', defaultFee: 55, active: true },
+      { id: 'fr-14', name: 'Flores & Suculentas', stallType: 'Jardinagem & Plantas', phone: '(41) 99901-2345', defaultFee: 32, active: true },
+      { id: 'fr-15', name: 'Yakisoba & Oriental', stallType: 'Culinária Oriental', phone: '(41) 99111-2233', defaultFee: 55, active: true },
+      { id: 'fr-16', name: 'Churros Gourmet', stallType: 'Doces & Churros', phone: '(41) 99222-3344', defaultFee: 55, active: true },
+    ];
+
+    const INITIAL_EDITIONS = [
+      { id: 'ed-15-10', date: '2026-10-15', label: '15/10/2026', status: 'realizada', sistOk: true },
+      { id: 'ed-08-10', date: '2026-10-08', label: '08/10/2026', status: 'realizada', sistOk: true },
+      { id: 'ed-01-10', date: '2026-10-01', label: '01/10/2026', status: 'realizada', sistOk: true },
+      { id: 'ed-24-09', date: '2026-09-24', label: '24/09/2026', status: 'cancelada', sistOk: false },
+      { id: 'ed-17-09', date: '2026-09-17', label: '17/09/2026', status: 'realizada', sistOk: true },
+      { id: 'ed-10-09', date: '2026-09-10', label: '10/09/2026', status: 'cancelada', sistOk: false },
+      { id: 'ed-03-09', date: '2026-09-03', label: '03/09/2026', status: 'realizada', sistOk: true },
+      { id: 'ed-27-08', date: '2026-08-27', label: '27/08/2026', status: 'realizada', sistOk: true },
+      { id: 'ed-20-08', date: '2026-08-20', label: '20/08/2026', status: 'realizada', sistOk: true },
+      { id: 'ed-13-08', date: '2026-08-13', label: '13/08/2026', status: 'realizada', sistOk: true },
+      { id: 'ed-06-08', date: '2026-08-06', label: '06/08/2026', status: 'realizada', sistOk: true },
+      { id: 'ed-30-07', date: '2026-07-30', label: '30/07/2026', status: 'realizada', sistOk: true },
+      { id: 'ed-23-07', date: '2026-07-23', label: '23/07/2026', status: 'realizada', sistOk: true },
+    ];
+
+    function buildInitialParticipations() {
+      const list = [];
+      INITIAL_EDITIONS.forEach((ed, edIdx) => {
+        INITIAL_FEIRANTES.forEach((fr, frIdx) => {
+          if (ed.status === 'cancelada') {
+            list.push({ id: `part-${ed.id}-${fr.id}`, editionId: ed.id, feiranteId: fr.id, amount: 0, status: 'cancelado' });
+            return;
+          }
+          if (fr.id === 'fr-1') {
+            if (ed.id === 'ed-15-10' || ed.id === 'ed-08-10' || ed.id === 'ed-03-09') {
+              list.push({ id: `part-${ed.id}-${fr.id}`, editionId: ed.id, feiranteId: fr.id, amount: 55, status: 'pendente' });
+              return;
+            }
+            if (ed.id === 'ed-01-10') {
+              list.push({ id: `part-${ed.id}-${fr.id}`, editionId: ed.id, feiranteId: fr.id, amount: 32, status: 'pendente' });
+              return;
+            }
+          }
+          if (fr.id === 'fr-5' && ed.id === 'ed-13-08') {
+            list.push({ id: `part-${ed.id}-${fr.id}`, editionId: ed.id, feiranteId: fr.id, amount: 55, status: 'pago_pix', note: 'Pagou Lincon' });
+            return;
+          }
+          if (fr.id === 'fr-12' && ed.id === 'ed-23-07') {
+            list.push({ id: `part-${ed.id}-${fr.id}`, editionId: ed.id, feiranteId: fr.id, amount: 0, status: 'atestado', note: 'Atestado' });
+            return;
+          }
+          const fee = ed.id === 'ed-01-10' ? 32 : fr.defaultFee;
+          const isCash = (edIdx + frIdx) % 3 === 0;
+          list.push({ id: `part-${ed.id}-${fr.id}`, editionId: ed.id, feiranteId: fr.id, amount: fee, status: isCash ? 'pago_dinheiro' : 'pago_pix' });
+        });
+      });
+      return list;
+    }
+
+    function buildInitialExpenses() {
+      const list = [];
+      const templates = [
+        { desc: 'Som & Música ao Vivo', cat: 'som', base: 150, method: 'pix' },
+        { desc: 'Segurança & Apoio', cat: 'seguranca', base: 200, method: 'dinheiro' },
+        { desc: 'Banheiro Químico', cat: 'banheiro', base: 90, method: 'pix' },
+        { desc: 'Energia & Gerador', cat: 'energia', base: 90, method: 'pix' },
+        { desc: 'Coordenação & Equipe', cat: 'coordenacao', base: 350, method: 'dinheiro' },
+      ];
+      INITIAL_EDITIONS.forEach((ed, idx) => {
+        if (ed.status === 'cancelada') return;
+        templates.forEach((tpl, tIdx) => {
+          const amount = tpl.cat === 'coordenacao' ? (idx % 2 === 0 ? 350 : 500) : (ed.id === 'ed-01-10' && tpl.cat === 'som' ? 0 : tpl.base);
+          if (amount > 0) {
+            list.push({ id: `orgexp-${ed.id}-${tIdx}`, editionId: ed.id, description: tpl.desc, category: tpl.cat, amount, paymentMethod: tpl.method });
+          }
+        });
+      });
+      return list;
+    }
+
+    const EXPENSE_ROWS = [
+      { cat: 'som', label: 'Som & Música ao Vivo', color: '#3B82F6' },
+      { cat: 'seguranca', label: 'Segurança & Apoio', color: '#EC4899' },
+      { cat: 'banheiro', label: 'Banheiro Químico', color: '#F59E0B' },
+      { cat: 'energia', label: 'Energia & Gerador', color: '#10B981' },
+      { cat: 'coordenacao', label: 'Coordenação & Equipe', color: '#8B5CF6' },
+      { cat: 'extras', label: 'Extras / Manutenção', color: '#64748B' },
+    ];
+
+    function loadState(key, fallbackFn) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+          const val = fallbackFn();
+          localStorage.setItem(key, JSON.stringify(val));
+          return val;
+        }
+        return JSON.parse(raw);
+      } catch {
+        return fallbackFn();
+      }
+    }
+
+    function App() {
+      const [feirantes, setFeirantes] = useState(() => loadState(KEYS.FEIRANTES, () => INITIAL_FEIRANTES));
+      const [editions, setEditions] = useState(() => loadState(KEYS.EDITIONS, () => INITIAL_EDITIONS));
+      const [participations, setParticipations] = useState(() => loadState(KEYS.PARTICIPATIONS, buildInitialParticipations));
+      const [orgExpenses, setOrgExpenses] = useState(() => loadState(KEYS.EXPENSES, buildInitialExpenses));
+      const [isDark, setIsDark] = useState(() => localStorage.getItem(KEYS.THEME) === 'true');
+      const [vaultPin, setVaultPin] = useState(() => localStorage.getItem(KEYS.PIN) || '');
+      const [isLocked, setIsLocked] = useState(() => Boolean(localStorage.getItem(KEYS.PIN)));
+      const [pinAttempt, setPinAttempt] = useState('');
+      const [pinError, setPinError] = useState(false);
+
+      const [tab, setTab] = useState('matrix'); // 'matrix' | 'reports' | 'feirantes' | 'charts' | 'backup'
+
+      // Modals
+      const [editingCell, setEditingCell] = useState(null);
+      const [cellStatus, setCellStatus] = useState('pago_pix');
+      const [cellAmount, setCellAmount] = useState('55');
+      const [cellNote, setCellNote] = useState('');
+
+      const [editingExp, setEditingExp] = useState(null);
+      const [expAmount, setExpAmount] = useState('0');
+      const [expMethod, setExpMethod] = useState('pix');
+
+      const [showNewEd, setShowNewEd] = useState(false);
+      const [newEdDate, setNewEdDate] = useState('2026-10-22');
+
+      const [showFrModal, setShowFrModal] = useState(false);
+      const [editingFr, setEditingFr] = useState(null);
+      const [frName, setFrName] = useState('');
+      const [frStall, setFrStall] = useState('');
+      const [frPhone, setFrPhone] = useState('');
+      const [frFee, setFrFee] = useState('55');
+
+      const [editingPhoneId, setEditingPhoneId] = useState(null);
+      const [inlinePhone, setInlinePhone] = useState('');
+      const [newPinInput, setNewPinInput] = useState('');
+
+      useEffect(() => {
+        document.documentElement.classList.toggle('dark', isDark);
+        localStorage.setItem(KEYS.THEME, String(isDark));
+      }, [isDark]);
+
+      const saveFeirantes = (d) => { setFeirantes(d); localStorage.setItem(KEYS.FEIRANTES, JSON.stringify(d)); };
+      const saveEditions = (d) => { setEditions(d); localStorage.setItem(KEYS.EDITIONS, JSON.stringify(d)); };
+      const saveParticipations = (d) => { setParticipations(d); localStorage.setItem(KEYS.PARTICIPATIONS, JSON.stringify(d)); };
+      const saveOrgExpenses = (d) => { setOrgExpenses(d); localStorage.setItem(KEYS.EXPENSES, JSON.stringify(d)); };
+
+      // Metrics
+      const realizedEditions = editions.filter(e => e.status === 'realizada');
+      let totalReceivedPix = 0, totalReceivedCash = 0, totalPending = 0;
+      participations.forEach(p => {
+        const ed = editions.find(e => e.id === p.editionId);
+        if (!ed || ed.status === 'cancelada') return;
+        if (p.status === 'pago_pix') totalReceivedPix += p.amount;
+        else if (p.status === 'pago_dinheiro') totalReceivedCash += p.amount;
+        else if (p.status === 'pendente') totalPending += p.amount;
+      });
+
+      let totalPaidPix = 0, totalPaidCash = 0;
+      orgExpenses.forEach(ex => {
+        const ed = editions.find(e => e.id === ex.editionId);
+        if (!ed || ed.status === 'cancelada') return;
+        if (ex.paymentMethod === 'pix') totalPaidPix += ex.amount;
+        else totalPaidCash += ex.amount;
+      });
+
+      const netPix = totalReceivedPix - totalPaidPix;
+      const netCash = totalReceivedCash - totalPaidCash;
+      const netTotal = netPix + netCash;
+
+      const pendingItems = participations
+        .filter(p => {
+          const ed = editions.find(e => e.id === p.editionId);
+          return ed && ed.status !== 'cancelada' && p.status === 'pendente' && p.amount > 0;
+        })
+        .map(p => ({
+          participation: p,
+          edition: editions.find(e => e.id === p.editionId),
+          feirante: feirantes.find(f => f.id === p.feiranteId) || { id: p.feiranteId, name: 'Feirante', phone: '' },
+        }))
+        .sort((a, b) => b.edition.date.localeCompare(a.edition.date));
+
+      // Cell handlers
+      const openCell = (ed, fr) => {
+        if (ed.status === 'cancelada') return;
+        const part = participations.find(p => p.editionId === ed.id && p.feiranteId === fr.id);
+        setEditingCell({ ed, fr });
+        setCellStatus(part?.status || 'pago_pix');
+        setCellAmount(part ? String(part.amount) : String(fr.defaultFee));
+        setCellNote(part?.note || '');
+      };
+
+      const saveCell = (e) => {
+        e.preventDefault();
+        const amt = (cellStatus === 'atestado' || cellStatus === 'ausente') ? 0 : (parseFloat(cellAmount) || 0);
+        const idx = participations.findIndex(p => p.editionId === editingCell.ed.id && p.feiranteId === editingCell.fr.id);
+        if (idx >= 0) {
+          const next = [...participations];
+          next[idx] = { ...next[idx], status: cellStatus, amount: amt, note: cellNote.trim() || undefined };
+          saveParticipations(next);
+        } else {
+          saveParticipations([...participations, {
+            id: `part-${editingCell.ed.id}-${editingCell.fr.id}`,
+            editionId: editingCell.ed.id,
+            feiranteId: editingCell.fr.id,
+            status: cellStatus,
+            amount: amt,
+            note: cellNote.trim() || undefined,
+          }]);
+        }
+        setEditingCell(null);
+      };
+
+      const deleteCell = () => {
+        saveParticipations(participations.filter(p => !(p.editionId === editingCell.ed.id && p.feiranteId === editingCell.fr.id)));
+        setEditingCell(null);
+      };
+
+      // Expense cell handlers
+      const openExpCell = (ed, row) => {
+        if (ed.status === 'cancelada') return;
+        const ex = orgExpenses.find(item => item.editionId === ed.id && item.category === row.cat);
+        setEditingExp({ ed, row });
+        setExpAmount(ex ? String(ex.amount) : '0');
+        setExpMethod(ex?.paymentMethod || 'pix');
+      };
+
+      const saveExpCell = (e) => {
+        e.preventDefault();
+        const amt = parseFloat(expAmount) || 0;
+        const idx = orgExpenses.findIndex(item => item.editionId === editingExp.ed.id && item.category === editingExp.row.cat);
+        if (idx >= 0) {
+          const next = [...orgExpenses];
+          next[idx] = { ...next[idx], amount: amt, paymentMethod: expMethod };
+          saveOrgExpenses(next);
+        } else {
+          saveOrgExpenses([...orgExpenses, {
+            id: `orgexp-${editingExp.ed.id}-${editingExp.row.cat}-${Date.now()}`,
+            editionId: editingExp.ed.id,
+            description: editingExp.row.label,
+            category: editingExp.row.cat,
+            amount: amt,
+            paymentMethod: expMethod,
+          }]);
+        }
+        setEditingExp(null);
+      };
+
+      const deleteExpCell = () => {
+        saveOrgExpenses(orgExpenses.filter(item => !(item.editionId === editingExp.ed.id && item.category === editingExp.row.cat)));
+        setEditingExp(null);
+      };
+
+      // Print PDF
+      const handlePrintPDF = () => {
+        const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório Geral de Feiras</title>
+        <style>
+          @page{size:A4;margin:14mm;}body{font-family:'Segoe UI',sans-serif;color:#1e293b;padding:20px;font-size:10.5pt;}
+          .header{display:flex;justify-content:space-between;border-bottom:2px solid #0f172a;padding-bottom:12px;margin-bottom:18px;}
+          .brand{font-size:20pt;font-weight:800;}.brand span{color:#10b981;}
+          .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+          .kpi{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;}
+          .kpi-l{font-size:8pt;text-transform:uppercase;color:#64748b;font-weight:600;}
+          .kpi-v{font-size:13pt;font-weight:700;font-family:monospace;margin-top:4px;}
+          table{width:100%;border-collapse:collapse;margin-bottom:18px;font-size:9pt;}
+          th{background:#f1f5f9;text-align:left;padding:7px;border-bottom:1px solid #cbd5e1;}
+          td{padding:7px;border-bottom:1px solid #f1f5f9;}
+          .right{text-align:right;font-family:monospace;}
+          @media print{button{display:none!important;}}
+        </style></head><body>
+        <div style="text-align:right;margin-bottom:10px;"><button onclick="window.print()" style="background:#0f172a;color:#fff;padding:8px 16px;border:none;border-radius:6px;cursor:pointer;">Imprimir / Salvar PDF</button></div>
+        <div class="header"><div><div class="brand">Feira da <span>Lua</span></div><div>Relatório Geral de Feiras e Cobranças</div></div><div style="text-align:right;font-size:9pt;">Emissão: ${new Date().toLocaleDateString('pt-BR')}<br>Pendente: <strong style="color:#dc2626">${formatCurrency(totalPending)}</strong></div></div>
+        <div class="kpi-grid">
+          <div class="kpi"><div class="kpi-l">Total de Feiras</div><div class="kpi-v">${realizedEditions.length}</div></div>
+          <div class="kpi"><div class="kpi-l">Total Dinheiro (Líq)</div><div class="kpi-v" style="color:#16a34a">${formatCurrency(netCash)}</div></div>
+          <div class="kpi"><div class="kpi-l">Total PIX (Líq)</div><div class="kpi-v" style="color:#0284c7">${formatCurrency(netPix)}</div></div>
+          <div class="kpi"><div class="kpi-l">Saldo Líquido Geral</div><div class="kpi-v">${formatCurrency(netTotal)}</div></div>
+        </div>
+        <h3>Pendentes para Cobrança (${pendingItems.length} · ${formatCurrency(totalPending)})</h3>
+        <table><thead><tr><th>Data</th><th>Feirante</th><th>Contato</th><th class="right">Valor</th></tr></thead><tbody>
+        ${pendingItems.length === 0 ? '<tr><td colspan="4" style="text-align:center">Nenhuma pendência.</td></tr>' : pendingItems.map(i => `<tr><td>${i.edition.label}</td><td><strong>${i.feirante.name}</strong></td><td>${i.feirante.phone || '-'}</td><td class="right" style="color:#dc2626"><strong>${formatCurrency(i.participation.amount)}</strong></td></tr>`).join('')}
+        </tbody></table></body></html>`;
+        const w = window.open('', '_blank');
+        if (w) { w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400); }
+      };
+
+      // Export / Import JSON Backup
+      const handleDownloadBackup = () => {
+        const payload = JSON.stringify({ app: 'Feira da Lua', date: new Date().toISOString(), feirantes, editions, participations, orgExpenses }, null, 2);
+        const blob = new Blob([payload], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `feira_da_lua_backup_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+      };
+
+      const handleRestoreBackup = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const parsed = JSON.parse(ev.target.result);
+            if (parsed.feirantes) saveFeirantes(parsed.feirantes);
+            if (parsed.editions) saveEditions(parsed.editions);
+            if (parsed.participations) saveParticipations(parsed.participations);
+            if (parsed.orgExpenses) saveOrgExpenses(parsed.orgExpenses);
+            alert('Backup restaurado com sucesso!');
+          } catch {
+            alert('Arquivo de backup inválido.');
+          }
+        };
+        reader.readAsText(file);
+      };
+
+      if (isLocked && vaultPin) {
+        return (
+          <div className="min-h-screen bg-black flex items-center justify-center p-4 text-white">
+            <div className="max-w-sm w-full bg-neutral-900 rounded-2xl p-8 border border-neutral-800 text-center space-y-5">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto"><LockIcon className="w-6 h-6" /></div>
+              <h1 className="text-lg font-bold">Feira da Lua Bloqueada</h1>
+              <form onSubmit={(e) => { e.preventDefault(); if (pinAttempt === vaultPin) { setIsLocked(false); setPinAttempt(''); setPinError(false); } else setPinError(true); }} className="space-y-4">
+                <input type="password" maxLength={6} autoFocus placeholder="••••" value={pinAttempt} onChange={e => setPinAttempt(e.target.value.replace(/\D/g, ''))} className="w-full text-center text-2xl tracking-[0.5em] py-2 bg-black border border-neutral-800 rounded-xl font-mono text-white" />
+                {pinError && <div className="text-xs text-rose-400">PIN incorreto</div>}
+                <button type="submit" className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-sm">Desbloquear</button>
+              </form>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Top Bar */}
+          <header className="sticky top-0 z-40 bg-white/95 dark:bg-neutral-950/95 backdrop-blur-md border-b border-slate-200 dark:border-neutral-800 no-print">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-6 px-4 sm:px-6 py-3.5">
+              <button onClick={() => setTab('matrix')} className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0 flex items-center gap-1.5">
+                <span>Feira da Lua</span>
+                <span className="text-emerald-500">·</span>
+                <span className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-widest hidden sm:inline">Gestão Financeira</span>
+              </button>
+
+              <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-neutral-300">
+                {[
+                  { id: 'matrix', label: 'Planilha Matriz' },
+                  { id: 'reports', label: `Cobranças (${pendingItems.length})` },
+                  { id: 'feirantes', label: 'Feirantes' },
+                  { id: 'charts', label: 'Gráficos & Custos' },
+                  { id: 'backup', label: 'Backup & PIN' },
+                ].map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => setTab(item.id)}
+                    className={`whitespace-nowrap shrink-0 hover:text-slate-900 dark:hover:text-white ${tab === item.id ? 'text-slate-900 dark:text-white font-bold border-b-2 border-emerald-500 pb-0.5' : ''}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </nav>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setIsDark(!isDark)}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-neutral-200 bg-slate-100 dark:bg-neutral-900 hover:bg-slate-200 dark:hover:bg-neutral-800 border border-slate-200 dark:border-neutral-800 rounded-lg whitespace-nowrap"
+                >
+                  {isDark ? <SunIcon className="w-3.5 h-3.5 text-amber-400" /> : <MoonIcon className="w-3.5 h-3.5 text-slate-600" />}
+                  <span>{isDark ? 'Fundo Claro' : 'Fundo Preto'}</span>
+                </button>
+                {vaultPin && (
+                  <button onClick={() => setIsLocked(true)} className="p-2 text-slate-500 dark:text-neutral-400 hover:text-white rounded-lg" title="Bloquear tela">
+                    <LockIcon className="w-4 h-4" />
+                  </button>
+                )}
+                <button onClick={handlePrintPDF} className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg whitespace-nowrap">
+                  <PrinterIcon className="w-3.5 h-3.5" />
+                  Exportar PDF
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+            {/* KPIs */}
+            <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-neutral-800">
+                <div>
+                  <h1 className="text-lg font-bold text-slate-900 dark:text-white">Feira da Lua — Controle Financeiro</h1>
+                  <p className="text-xs text-slate-500 dark:text-neutral-400">Recebimentos por barraca, custos da feira, cobranças pendentes e fechamento PIX / Dinheiro</p>
+                </div>
+                <button onClick={() => setShowNewEd(true)} className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg self-start sm:self-auto">
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  Nova Data de Feira
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+                <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+                  <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Total de Feiras</div>
+                  <div className="text-2xl font-bold font-mono mt-1">{realizedEditions.length}</div>
+                </div>
+                <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+                  <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Total Dinheiro (Líq)</div>
+                  <div className={`text-2xl font-bold font-mono mt-1 ${netCash >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>{formatCurrency(netCash)}</div>
+                </div>
+                <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+                  <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Total PIX (Líq)</div>
+                  <div className={`text-2xl font-bold font-mono mt-1 ${netPix >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600'}`}>{formatCurrency(netPix)}</div>
+                </div>
+                <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+                  <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Saldo Líquido Geral</div>
+                  <div className="text-2xl font-bold font-mono mt-1">{formatCurrency(netTotal)}</div>
+                  <div className="text-[11px] text-amber-600 dark:text-amber-400 font-mono font-semibold">Pendente: {formatCurrency(totalPending)}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* TAB: PLANILHA MATRIZ */}
+            {tab === 'matrix' && (
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 shadow-sm overflow-hidden">
+                <div className="px-5 py-3 bg-slate-50 dark:bg-neutral-950 border-b border-slate-200 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <span className="font-semibold">Clique em qualquer célula para editar ou excluir o lançamento:</span>
+                  <div className="flex flex-wrap items-center gap-3 text-[11px]">
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 bg-sky-100 dark:bg-sky-900 border border-sky-400 inline-block"></span> Pago PIX</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 bg-emerald-100 dark:bg-emerald-900 border border-emerald-400 inline-block"></span> Pago Dinheiro</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 bg-amber-200 dark:bg-amber-800 border border-amber-500 inline-block"></span> Pendente</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 bg-rose-600 inline-block"></span> Cancelada</span>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-900 dark:bg-black text-white">
+                        <th className="sticky left-0 z-20 bg-slate-900 dark:bg-black py-2.5 px-3 text-left font-bold min-w-[170px] border-r border-slate-700 dark:border-neutral-800">Feirante</th>
+                        {editions.map(ed => (
+                          <th key={ed.id} className={`py-2 px-2 text-center font-mono min-w-[96px] border-r border-slate-700 dark:border-neutral-800 ${ed.status === 'cancelada' ? 'bg-rose-700' : ''}`}>
+                            <div className="font-bold">{ed.label.slice(0, 5)}</div>
+                            <div className="text-[10px] opacity-75">{ed.label.slice(6)}</div>
+                            <div className="mt-1 flex items-center justify-center gap-2">
+                              <button onClick={() => saveEditions(editions.map(item => item.id === ed.id ? { ...item, status: item.status === 'cancelada' ? 'realizada' : 'cancelada' } : item))} className="text-[9px] underline opacity-80 hover:opacity-100">
+                                {ed.status === 'cancelada' ? 'Reativar' : 'Cancelar'}
+                              </button>
+                              <button onClick={() => { if (confirm(`Excluir data ${ed.label}?`)) { saveEditions(editions.filter(x => x.id !== ed.id)); saveParticipations(participations.filter(p => p.editionId !== ed.id)); saveOrgExpenses(orgExpenses.filter(o => o.editionId !== ed.id)); } }} className="text-[9px] text-rose-300 hover:text-rose-100">
+                                <TrashIcon className="w-2.5 h-2.5 inline" />
+                              </button>
+                            </div>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-neutral-800">
+                      {feirantes.map(fr => (
+                        <tr key={fr.id} className="hover:bg-slate-50/80 dark:hover:bg-neutral-800/40">
+                          <td className="sticky left-0 z-10 bg-white dark:bg-neutral-900 py-2 px-3 font-semibold border-r border-slate-200 dark:border-neutral-800 truncate max-w-[180px]">{fr.name}</td>
+                          {editions.map(ed => {
+                            if (ed.status === 'cancelada') return <td key={ed.id} className="bg-rose-600 text-white text-center font-bold text-[10px] py-2 px-1 border-r border-rose-500">CANCELADO</td>;
+                            const part = participations.find(p => p.editionId === ed.id && p.feiranteId === fr.id);
+                            const st = part?.status || 'ausente';
+                            let cls = 'bg-white dark:bg-neutral-900 text-slate-400 dark:text-neutral-600';
+                            let txt = '—';
+                            if (st === 'pago_pix') { cls = 'bg-sky-50 dark:bg-sky-950/50 text-sky-800 dark:text-sky-300 font-semibold'; txt = formatCurrency(part.amount); }
+                            else if (st === 'pago_dinheiro') { cls = 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 font-semibold'; txt = formatCurrency(part.amount); }
+                            else if (st === 'pendente') { cls = 'bg-amber-200 dark:bg-amber-900/60 text-amber-950 dark:text-amber-200 font-bold'; txt = formatCurrency(part.amount); }
+                            else if (st === 'atestado') { cls = 'bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-neutral-300 text-[10px]'; txt = 'ATESTADO'; }
+                            return (
+                              <td key={ed.id} onClick={() => openCell(ed, fr)} className={`py-2 px-1.5 text-center font-mono border-r border-slate-200 dark:border-neutral-800 cursor-pointer ${cls}`}>
+                                <div>{txt}</div>
+                                {part?.note && <div className="text-[9px] font-sans font-bold uppercase text-orange-600 dark:text-orange-300 truncate max-w-[85px] mx-auto">{part.note}</div>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+
+                      <tr className="bg-emerald-900 text-white font-bold font-mono">
+                        <td className="sticky left-0 z-10 bg-emerald-900 py-2.5 px-3 border-r border-emerald-800 font-sans">TOTAL RECEBIDO</td>
+                        {editions.map(ed => {
+                          const sum = ed.status === 'cancelada' ? 0 : participations.filter(p => p.editionId === ed.id && (p.status === 'pago_pix' || p.status === 'pago_dinheiro')).reduce((s, p) => s + p.amount, 0);
+                          return <td key={ed.id} className="py-2.5 px-2 text-center border-r border-emerald-800">{formatCurrency(sum)}</td>;
+                        })}
+                      </tr>
+
+                      <tr className="bg-amber-800 text-white font-bold">
+                        <td className="sticky left-0 z-10 bg-amber-800 py-2 px-3 border-r border-amber-700">PAGAMENTOS / CUSTOS</td>
+                        {editions.map(ed => <td key={ed.id} className="py-2 px-2 text-center font-mono text-[11px] border-r border-amber-700">{ed.label}</td>)}
+                      </tr>
+
+                      {EXPENSE_ROWS.map(row => (
+                        <tr key={row.cat} className="bg-rose-50/30 dark:bg-rose-950/10">
+                          <td className="sticky left-0 z-10 bg-white dark:bg-neutral-900 py-2 px-3 font-medium border-r border-slate-200 dark:border-neutral-800">{row.label}</td>
+                          {editions.map(ed => {
+                            if (ed.status === 'cancelada') return <td key={ed.id} className="bg-rose-600 text-white text-center font-bold text-[10px] py-2 px-1 border-r border-rose-500">CANCELADO</td>;
+                            const ex = orgExpenses.find(item => item.editionId === ed.id && item.category === row.cat);
+                            return (
+                              <td key={ed.id} onClick={() => openExpCell(ed, row)} className="py-2 px-1.5 text-center font-mono text-rose-900 dark:text-rose-300 border-r border-slate-200 dark:border-neutral-800 cursor-pointer hover:bg-rose-100/60 dark:hover:bg-rose-900/30">
+                                {ex && ex.amount > 0 ? formatCurrency(ex.amount) : 'R$ 0,00'}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+
+                      <tr className="bg-rose-900 text-white font-bold font-mono">
+                        <td className="sticky left-0 z-10 bg-rose-900 py-2.5 px-3 border-r border-rose-800 font-sans">TOTAL PAGO</td>
+                        {editions.map(ed => {
+                          const sum = ed.status === 'cancelada' ? 0 : orgExpenses.filter(e => e.editionId === ed.id).reduce((s, e) => s + e.amount, 0);
+                          return <td key={ed.id} className="py-2.5 px-2 text-center border-r border-rose-800">{formatCurrency(sum)}</td>;
+                        })}
+                      </tr>
+
+                      <tr className="bg-slate-900 dark:bg-black text-white font-bold font-mono">
+                        <td className="sticky left-0 z-10 bg-slate-900 dark:bg-black py-2.5 px-3 border-r border-slate-700 dark:border-neutral-800 font-sans">SALDO LÍQUIDO</td>
+                        {editions.map(ed => {
+                          if (ed.status === 'cancelada') return <td key={ed.id} className="py-2.5 px-2 text-center border-r border-slate-700 dark:border-neutral-800 text-slate-400">R$ 0,00</td>;
+                          const rec = participations.filter(p => p.editionId === ed.id && (p.status === 'pago_pix' || p.status === 'pago_dinheiro')).reduce((s, p) => s + p.amount, 0);
+                          const pag = orgExpenses.filter(e => e.editionId === ed.id).reduce((s, e) => s + e.amount, 0);
+                          const net = rec - pag;
+                          return <td key={ed.id} className={`py-2.5 px-2 text-center border-r border-slate-700 dark:border-neutral-800 ${net >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{formatCurrency(net)}</td>;
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: COBRANÇAS PENDENTES */}
+            {tab === 'reports' && (
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-neutral-800">
+                  <div>
+                    <h2 className="text-base font-bold">Relatório de Pendentes para Cobrança</h2>
+                    <p className="text-xs text-slate-500 dark:text-neutral-400">Lista consolidada de feirantes com pagamento pendente</p>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-mono text-xs font-bold">
+                    Total Pendente: {formatCurrency(totalPending)}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto mt-4">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 dark:border-neutral-800 text-slate-500 dark:text-neutral-400 uppercase text-[11px]">
+                        <th className="py-3 px-3">Feira (Data)</th>
+                        <th className="py-3 px-3">Feirante</th>
+                        <th className="py-3 px-3">Contato</th>
+                        <th className="py-3 px-3 text-right">Valor Pendente</th>
+                        <th className="py-3 px-3 text-right">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
+                      {pendingItems.map(({ participation, edition, feirante }) => (
+                        <tr key={participation.id}>
+                          <td className="py-3 px-3 font-mono font-semibold">{edition.label}</td>
+                          <td className="py-3 px-3 font-bold">{feirante.name}</td>
+                          <td className="py-3 px-3">
+                            {editingPhoneId === feirante.id ? (
+                              <div className="flex items-center gap-1">
+                                <input type="text" value={inlinePhone} onChange={e => setInlinePhone(e.target.value)} placeholder="(41) 99999-9999" className="px-2 py-1 text-xs bg-slate-50 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 rounded w-32" />
+                                <button onClick={() => { saveFeirantes(feirantes.map(f => f.id === feirante.id ? { ...f, phone: inlinePhone.trim() } : f)); setEditingPhoneId(null); }} className="p-1 text-emerald-500"><CheckIcon className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => setEditingPhoneId(null)} className="p-1 text-slate-400"><XIcon className="w-3.5 h-3.5" /></button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono">{feirante.phone || '-'}</span>
+                                <button onClick={() => { setEditingPhoneId(feirante.id); setInlinePhone(feirante.phone || ''); }} className="text-[11px] text-indigo-500 hover:underline">
+                                  {feirante.phone ? 'Editar' : '+ Adicionar'}
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400">{formatCurrency(participation.amount)}</td>
+                          <td className="py-3 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button onClick={() => saveParticipations(participations.map(p => p.id === participation.id ? { ...p, status: 'pago_pix' } : p))} className="px-2 py-1 text-[11px] font-semibold bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-300 rounded">Quitar PIX</button>
+                              <button onClick={() => saveParticipations(participations.map(p => p.id === participation.id ? { ...p, status: 'pago_dinheiro' } : p))} className="px-2 py-1 text-[11px] font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 rounded">Quitar Dinheiro</button>
+                              {feirante.phone && (
+                                <a href={`https://wa.me/55${feirante.phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${feirante.name}, consta pendência da Feira ${edition.label} no valor de ${formatCurrency(participation.amount)}.`)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold bg-emerald-600 text-white rounded">
+                                  <MessageIcon className="w-3 h-3" /> Cobrar
+                                </a>
+                              )}
+                              <button onClick={() => { if (confirm('Excluir esta pendência?')) saveParticipations(participations.filter(p => p.id !== participation.id)); }} className="p-1 text-slate-400 hover:text-rose-600" title="Excluir lançamento">
+                                <TrashIcon className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: FEIRANTES */}
+            {tab === 'feirantes' && (
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-neutral-800">
+                  <div>
+                    <h2 className="text-base font-bold">Cadastro de Feirantes</h2>
+                    <p className="text-xs text-slate-500 dark:text-neutral-400">Gerencie barracas, taxas e contatos</p>
+                  </div>
+                  <button onClick={() => { setEditingFr(null); setFrName(''); setFrStall(''); setFrPhone(''); setFrFee('55'); setShowFrModal(true); }} className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg">
+                    <PlusIcon className="w-4 h-4" /> Novo Feirante
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-5">
+                  {feirantes.map(f => (
+                    <div key={f.id} className="p-4 rounded-xl border border-slate-200 dark:border-neutral-800 bg-slate-50/50 dark:bg-neutral-950 flex justify-between items-start">
+                      <div>
+                        <h3 className="text-sm font-bold">{f.name}</h3>
+                        <div className="text-xs text-slate-500 dark:text-neutral-400">{f.stallType}</div>
+                        <div className="text-xs font-mono mt-2">Taxa: {formatCurrency(f.defaultFee)} · {f.phone || 'Sem telefone'}</div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => { setEditingFr(f); setFrName(f.name); setFrStall(f.stallType); setFrPhone(f.phone || ''); setFrFee(String(f.defaultFee)); setShowFrModal(true); }} className="p-1.5 text-slate-400 hover:text-white"><PencilIcon className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { if (confirm(`Excluir ${f.name}?`)) { saveFeirantes(feirantes.filter(x => x.id !== f.id)); saveParticipations(participations.filter(p => p.feiranteId !== f.id)); } }} className="p-1.5 text-slate-400 hover:text-rose-600"><TrashIcon className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: GRÁFICOS & CUSTOS */}
+            {tab === 'charts' && (
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm space-y-6">
+                <h2 className="text-base font-bold">Recebimentos vs. Pagamentos por Edição</h2>
+                <div className="h-60 flex items-end justify-between gap-2 pt-6 border-b border-slate-100 dark:border-neutral-800">
+                  {[...realizedEditions].reverse().map(ed => {
+                    const rec = participations.filter(p => p.editionId === ed.id && (p.status === 'pago_pix' || p.status === 'pago_dinheiro')).reduce((s, p) => s + p.amount, 0);
+                    const exp = orgExpenses.filter(e => e.editionId === ed.id).reduce((s, e) => s + e.amount, 0);
+                    const max = 1800;
+                    return (
+                      <div key={ed.id} className="flex-1 flex flex-col items-center h-full justify-end group relative">
+                        <div className="w-full flex items-end justify-center gap-1 h-44">
+                          <div style={{ height: `${Math.min(100, (rec / max) * 100)}%` }} className="w-1/2 max-w-[22px] bg-emerald-500 rounded-t-sm" title={`Recebido: ${formatCurrency(rec)}`} />
+                          <div style={{ height: `${Math.min(100, (exp / max) * 100)}%` }} className="w-1/2 max-w-[22px] bg-rose-500 rounded-t-sm" title={`Pago: ${formatCurrency(exp)}`} />
+                        </div>
+                        <span className="mt-2 text-[10px] font-mono text-slate-500 dark:text-neutral-400">{ed.label.slice(0, 5)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* TAB: BACKUP & PIN */}
+            {tab === 'backup' && (
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-base font-bold">Backup Local & Segurança por PIN</h2>
+                    <p className="text-xs text-slate-500 dark:text-neutral-400">Exporte seus dados em arquivo .JSON ou proteja o acesso com senha numérica</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={handleDownloadBackup} className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-emerald-600 text-white rounded-lg"><DownloadIcon className="w-3.5 h-3.5" /> Baixar Backup (.JSON)</button>
+                    <label className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 dark:bg-neutral-800 rounded-lg cursor-pointer"><UploadIcon className="w-3.5 h-3.5" /> Restaurar Backup<input type="file" accept=".json" onChange={handleRestoreBackup} className="hidden" /></label>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-neutral-800 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-bold">Bloqueio por PIN: {vaultPin ? 'Ativado' : 'Desativado'}</div>
+                    <div className="text-xs text-slate-500 dark:text-neutral-400">Exige senha numérica ao abrir o arquivo</div>
+                  </div>
+                  {vaultPin ? (
+                    <button onClick={() => { localStorage.removeItem(KEYS.PIN); setVaultPin(''); }} className="px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 dark:bg-rose-950/40 rounded-lg">Remover PIN</button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input type="password" maxLength={6} placeholder="PIN (4-6 dígitos)" value={newPinInput} onChange={e => setNewPinInput(e.target.value.replace(/\D/g, ''))} className="px-3 py-1.5 text-xs font-mono bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg" />
+                      <button onClick={() => { if (newPinInput.length >= 4) { localStorage.setItem(KEYS.PIN, newPinInput); setVaultPin(newPinInput); setNewPinInput(''); } }} className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg">Ativar PIN</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </main>
+
+          {/* MODAL: EDITAR / EXCLUIR CÉLULA */}
+          {editingCell && (
+            <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 max-w-md w-full p-6 shadow-xl">
+                <h3 className="text-base font-bold mb-4">{editingCell.fr.name} — {editingCell.ed.label}</h3>
+                <form onSubmit={saveCell} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'pago_pix', label: 'Pago via PIX' },
+                      { id: 'pago_dinheiro', label: 'Pago em Dinheiro' },
+                      { id: 'pendente', label: 'Pendente (Cobrar)' },
+                      { id: 'atestado', label: 'Atestado' },
+                      { id: 'ausente', label: 'Ausente' },
+                    ].map(st => (
+                      <button key={st.id} type="button" onClick={() => setCellStatus(st.id)} className={`px-3 py-2 text-xs font-semibold rounded-lg border text-left ${cellStatus === st.id ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 dark:bg-neutral-800 border-slate-200 dark:border-neutral-700'}`}>
+                        {st.label}
+                      </button>
+                    ))}
+                  </div>
+                  {cellStatus !== 'atestado' && cellStatus !== 'ausente' && (
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Valor (R$)</label>
+                      <input type="number" step="0.01" value={cellAmount} onChange={e => setCellAmount(e.target.value)} className="w-full px-3 py-2 text-sm font-mono bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg" />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Observação</label>
+                    <input type="text" value={cellNote} onChange={e => setCellNote(e.target.value)} placeholder="Ex: Pagou Lincon" className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg" />
+                  </div>
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-neutral-800">
+                    <button type="button" onClick={deleteCell} className="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg">
+                      <TrashIcon className="w-3.5 h-3.5" /> Excluir Lançamento
+                    </button>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setEditingCell(null)} className="px-4 py-2 text-xs rounded-lg bg-slate-100 dark:bg-neutral-800">Cancelar</button>
+                      <button type="submit" className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg">Salvar</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: EDITAR / EXCLUIR DESPESA */}
+          {editingExp && (
+            <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 max-w-sm w-full p-6 shadow-xl">
+                <h3 className="text-base font-bold mb-1">{editingExp.row.label}</h3>
+                <p className="text-xs text-slate-500 mb-4">Data: {editingExp.ed.label}</p>
+                <form onSubmit={saveExpCell} className="space-y-4">
+                  <input type="number" step="0.01" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full px-3 py-2 text-sm font-mono bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setExpMethod('pix')} className={`py-2 text-xs font-semibold rounded-lg border ${expMethod === 'pix' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 dark:bg-neutral-800 border-slate-200 dark:border-neutral-700'}`}>PIX</button>
+                    <button type="button" onClick={() => setExpMethod('dinheiro')} className={`py-2 text-xs font-semibold rounded-lg border ${expMethod === 'dinheiro' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 dark:bg-neutral-800 border-slate-200 dark:border-neutral-700'}`}>Dinheiro</button>
+                  </div>
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-neutral-800">
+                    <button type="button" onClick={deleteExpCell} className="flex items-center gap-1 px-2.5 py-2 text-xs font-semibold text-rose-600"><TrashIcon className="w-3.5 h-3.5" /> Excluir</button>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setEditingExp(null)} className="px-3.5 py-2 text-xs rounded-lg bg-slate-100 dark:bg-neutral-800">Cancelar</button>
+                      <button type="submit" className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg">Salvar</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: NOVA DATA */}
+          {showNewEd && (
+            <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 max-w-sm w-full p-6 shadow-xl">
+                <h3 className="text-base font-bold mb-4">Nova Data de Feira</h3>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const label = formatDateBR(newEdDate);
+                  const id = `ed-${newEdDate}-${Date.now()}`;
+                  saveEditions([{ id, date: newEdDate, label, status: 'realizada', sistOk: true }, ...editions]);
+                  saveParticipations([...participations, ...feirantes.map(f => ({ id: `part-${id}-${f.id}`, editionId: id, feiranteId: f.id, amount: f.defaultFee, status: 'pendente' }))]);
+                  setShowNewEd(false);
+                }} className="space-y-4">
+                  <input type="date" required value={newEdDate} onChange={e => setNewEdDate(e.target.value)} className="w-full px-3 py-2 text-sm font-mono bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg" />
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setShowNewEd(false)} className="px-4 py-2 text-xs rounded-lg bg-slate-100 dark:bg-neutral-800">Cancelar</button>
+                    <button type="submit" className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg">Criar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: FEIRANTE */}
+          {showFrModal && (
+            <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 max-w-md w-full p-6 shadow-xl">
+                <h3 className="text-base font-bold mb-4">{editingFr ? 'Editar Feirante' : 'Novo Feirante'}</h3>
+                <form onSubmit={(e) => {
+                  e.preventDefault();
+                  const fee = parseFloat(frFee) || 55;
+                  if (editingFr) {
+                    saveFeirantes(feirantes.map(f => f.id === editingFr.id ? { ...f, name: frName, stallType: frStall, phone: frPhone, defaultFee: fee } : f));
+                  } else {
+                    saveFeirantes([...feirantes, { id: `fr-${Date.now()}`, name: frName, stallType: frStall || 'Barraca', phone: frPhone, defaultFee: fee, active: true }]);
+                  }
+                  setShowFrModal(false);
+                }} className="space-y-3">
+                  <input type="text" required placeholder="Nome da Barraca" value={frName} onChange={e => setFrName(e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg" />
+                  <input type="text" placeholder="Ramo / Produto" value={frStall} onChange={e => setFrStall(e.target.value)} className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="text" placeholder="WhatsApp" value={frPhone} onChange={e => setFrPhone(e.target.value)} className="w-full px-3 py-2 text-sm font-mono bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg" />
+                    <input type="number" step="0.01" required placeholder="Taxa R$" value={frFee} onChange={e => setFrFee(e.target.value)} className="w-full px-3 py-2 text-sm font-mono bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg" />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-3">
+                    <button type="button" onClick={() => setShowFrModal(false)} className="px-4 py-2 text-xs rounded-lg bg-slate-100 dark:bg-neutral-800">Cancelar</button>
+                    <button type="submit" className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg">Salvar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
