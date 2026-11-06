@@ -1,30 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import {
-  CloudBackupSnapshot,
-  SecuritySettings,
   Feirante,
   FeiraEdition,
   FeiraParticipation,
   FeiraOrgExpense,
+  FeiraExpenseCategoryItem,
 } from './types/finance';
 import { storageService } from './services/storage';
 import { Navbar, AppTab } from './components/Navbar';
 import { FeiraManagement } from './components/FeiraManagement';
 import { FeiraCharts } from './components/FeiraCharts';
-import { CloudBackupSecurity } from './components/CloudBackupSecurity';
 import { pdfReportGenerator } from './services/pdfReportGenerator';
-import { ShieldCheck, Lock } from 'lucide-react';
 
 const THEME_STORAGE_KEY = 'finanzen_dark_theme_v1';
 
 export default function App() {
-  // Core Feira & Security State
+  // Core Feira State
   const [feirantes, setFeirantes] = useState<Feirante[]>(() => storageService.getFeirantes());
   const [feiraEditions, setFeiraEditions] = useState<FeiraEdition[]>(() => storageService.getFeiraEditions());
   const [feiraParticipations, setFeiraParticipations] = useState<FeiraParticipation[]>(() => storageService.getFeiraParticipations());
   const [feiraOrgExpenses, setFeiraOrgExpenses] = useState<FeiraOrgExpense[]>(() => storageService.getFeiraOrgExpenses());
-  const [backups, setBackups] = useState<CloudBackupSnapshot[]>(() => storageService.getBackups());
-  const [security, setSecurity] = useState<SecuritySettings>(() => storageService.getSecurity());
+  const [expenseCategories, setExpenseCategories] = useState<FeiraExpenseCategoryItem[]>(() => storageService.getFeiraExpenseCategories());
 
   // Theme State (Fundo Preto / Claro)
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -37,18 +33,7 @@ export default function App() {
   }, [isDark]);
 
   // Navigation State
-  const [currentTab, setCurrentTab] = useState<AppTab>('matrix');
-  const [pinUnlockInput, setPinUnlockInput] = useState('');
-  const [pinError, setPinError] = useState(false);
-
-  const handleReloadAll = () => {
-    setFeirantes(storageService.getFeirantes());
-    setFeiraEditions(storageService.getFeiraEditions());
-    setFeiraParticipations(storageService.getFeiraParticipations());
-    setFeiraOrgExpenses(storageService.getFeiraOrgExpenses());
-    setBackups(storageService.getBackups());
-    setSecurity(storageService.getSecurity());
-  };
+  const [currentTab, setCurrentTab] = useState<AppTab>('geral');
 
   const handleUpdateFeirantes = (updated: Feirante[]) => {
     setFeirantes(updated);
@@ -70,30 +55,9 @@ export default function App() {
     storageService.saveFeiraOrgExpenses(updated);
   };
 
-  const handleUpdateBackups = (updated: CloudBackupSnapshot[]) => {
-    setBackups(updated);
-    storageService.saveBackups(updated);
-  };
-
-  const handleUpdateSecurity = (updated: SecuritySettings) => {
-    setSecurity(updated);
-    storageService.saveSecurity(updated);
-  };
-
-  // Lock / Unlock Screen Logic
-  const handleToggleLock = () => {
-    handleUpdateSecurity({ ...security, isLocked: !security.isLocked });
-  };
-
-  const handleUnlockPin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pinUnlockInput === security.vaultPinHash || pinUnlockInput === '1234') {
-      handleUpdateSecurity({ ...security, isLocked: false });
-      setPinUnlockInput('');
-      setPinError(false);
-    } else {
-      setPinError(true);
-    }
+  const handleUpdateExpenseCategories = (updated: FeiraExpenseCategoryItem[]) => {
+    setExpenseCategories(updated);
+    storageService.saveFeiraExpenseCategories(updated);
   };
 
   // Print Consolidated Feira PDF from Top Bar
@@ -179,53 +143,6 @@ export default function App() {
     });
   };
 
-  if (security.vaultPinEnabled && security.isLocked) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4 text-white">
-        <div className="max-w-sm w-full bg-neutral-900 rounded-2xl p-8 border border-neutral-800 text-center shadow-2xl space-y-6">
-          <div className="w-14 h-14 bg-emerald-500/10 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto border border-emerald-500/20">
-            <Lock className="w-7 h-7" />
-          </div>
-
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Feira da Lua Bloqueada</h1>
-            <p className="text-xs text-neutral-400 mt-1">
-              Digite seu PIN de segurança para acessar a gestão financeira da feira.
-            </p>
-          </div>
-
-          <form onSubmit={handleUnlockPin} className="space-y-4">
-            <input
-              type="password"
-              maxLength={6}
-              autoFocus
-              placeholder="••••"
-              value={pinUnlockInput}
-              onChange={e => {
-                setPinUnlockInput(e.target.value.replace(/\D/g, ''));
-                setPinError(false);
-              }}
-              className="w-full text-center text-2xl tracking-[0.5em] py-2.5 px-4 bg-black border border-neutral-800 rounded-xl font-mono text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-
-            {pinError && (
-              <div className="text-xs text-rose-400 font-medium">
-                PIN incorreto. Tente novamente.
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-2.5 px-4 text-sm font-bold bg-emerald-600 hover:bg-emerald-500 rounded-xl transition-colors shadow-lg"
-            >
-              Desbloquear Acesso
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-neutral-100 flex flex-col">
       <Navbar
@@ -234,12 +151,10 @@ export default function App() {
         onPrintReport={handlePrintConsolidatedPDF}
         isDark={isDark}
         onToggleDark={() => setIsDark(prev => !prev)}
-        isVaultLocked={security.vaultPinEnabled && security.isLocked}
-        onToggleLock={security.vaultPinEnabled ? handleToggleLock : undefined}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {(currentTab === 'matrix' || currentTab === 'reports' || currentTab === 'feirantes') && (
+        {(currentTab === 'geral' || currentTab === 'reports' || currentTab === 'feirantes') && (
           <FeiraManagement
             activeSubTab={currentTab}
             onChangeSubTab={tab => setCurrentTab(tab)}
@@ -247,10 +162,12 @@ export default function App() {
             editions={feiraEditions}
             participations={feiraParticipations}
             orgExpenses={feiraOrgExpenses}
+            expenseCategories={expenseCategories}
             onUpdateFeirantes={handleUpdateFeirantes}
             onUpdateEditions={handleUpdateFeiraEditions}
             onUpdateParticipations={handleUpdateFeiraParticipations}
             onUpdateOrgExpenses={handleUpdateFeiraOrgExpenses}
+            onUpdateExpenseCategories={handleUpdateExpenseCategories}
           />
         )}
 
@@ -259,16 +176,7 @@ export default function App() {
             editions={feiraEditions}
             participations={feiraParticipations}
             orgExpenses={feiraOrgExpenses}
-          />
-        )}
-
-        {currentTab === 'security' && (
-          <CloudBackupSecurity
-            backups={backups}
-            security={security}
-            onUpdateBackups={handleUpdateBackups}
-            onUpdateSecurity={handleUpdateSecurity}
-            onRestoreTriggered={handleReloadAll}
+            expenseCategories={expenseCategories}
           />
         )}
       </main>
@@ -279,13 +187,6 @@ export default function App() {
             <span className="font-bold text-slate-700 dark:text-neutral-200">Feira da Lua</span>
             <span>—</span>
             <span>Gestão Financeira de Recebimentos, Pagamentos e Feirantes</span>
-          </div>
-
-          <div className="flex items-center gap-4 text-[11px]">
-            <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Backup Seguro Ativo
-            </span>
           </div>
         </div>
       </footer>

@@ -5,6 +5,7 @@ import {
   FeiraParticipation,
   FeiraOrgExpense,
   FeiraCellStatus,
+  FeiraExpenseCategoryItem,
 } from '../types/finance';
 import { formatCurrency, formatDateBR, pdfReportGenerator } from '../services/pdfReportGenerator';
 import {
@@ -21,26 +22,21 @@ import {
 } from 'lucide-react';
 
 interface FeiraManagementProps {
-  activeSubTab: 'matrix' | 'reports' | 'feirantes';
-  onChangeSubTab: (tab: 'matrix' | 'reports' | 'feirantes') => void;
+  activeSubTab: 'geral' | 'reports' | 'feirantes';
+  onChangeSubTab: (tab: 'geral' | 'reports' | 'feirantes') => void;
   feirantes: Feirante[];
   editions: FeiraEdition[];
   participations: FeiraParticipation[];
   orgExpenses: FeiraOrgExpense[];
+  expenseCategories: FeiraExpenseCategoryItem[];
   onUpdateFeirantes: (data: Feirante[]) => void;
   onUpdateEditions: (data: FeiraEdition[]) => void;
   onUpdateParticipations: (data: FeiraParticipation[]) => void;
   onUpdateOrgExpenses: (data: FeiraOrgExpense[]) => void;
+  onUpdateExpenseCategories: (data: FeiraExpenseCategoryItem[]) => void;
 }
 
-const EXPENSE_ROWS: { cat: FeiraOrgExpense['category']; label: string }[] = [
-  { cat: 'som', label: 'Som & Música ao Vivo' },
-  { cat: 'seguranca', label: 'Segurança & Apoio' },
-  { cat: 'banheiro', label: 'Banheiro Químico' },
-  { cat: 'energia', label: 'Energia & Gerador' },
-  { cat: 'coordenacao', label: 'Coordenação & Equipe' },
-  { cat: 'extras', label: 'Extras / Manutenção' },
-];
+const COLOR_PALETTE = ['#3B82F6', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6', '#06B6D4', '#F97316', '#64748B'];
 
 export const FeiraManagement: React.FC<FeiraManagementProps> = ({
   activeSubTab,
@@ -49,10 +45,12 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
   editions,
   participations,
   orgExpenses,
+  expenseCategories,
   onUpdateFeirantes,
   onUpdateEditions,
   onUpdateParticipations,
   onUpdateOrgExpenses,
+  onUpdateExpenseCategories,
 }) => {
   // Cell editor modal state
   const [editingCell, setEditingCell] = useState<{
@@ -67,12 +65,26 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
   // Expense cell editor modal state
   const [editingExpenseCell, setEditingExpenseCell] = useState<{
     edition: FeiraEdition;
-    cat: FeiraOrgExpense['category'];
+    cat: string;
     label: string;
     existing?: FeiraOrgExpense;
   } | null>(null);
   const [expAmount, setExpAmount] = useState('0');
   const [expMethod, setExpMethod] = useState<'pix' | 'dinheiro'>('pix');
+
+  // Inline editing in Geral table: Feirante name, Edition date, Cost row label
+  const [editingFrRowId, setEditingFrRowId] = useState<string | null>(null);
+  const [inlineFrName, setInlineFrName] = useState('');
+
+  const [editingEdColId, setEditingEdColId] = useState<string | null>(null);
+  const [inlineEdDate, setInlineEdDate] = useState('');
+
+  const [editingCostRowId, setEditingCostRowId] = useState<string | null>(null);
+  const [inlineCostLabel, setInlineCostLabel] = useState('');
+
+  // New Cost Row modal
+  const [showNewCostModal, setShowNewCostModal] = useState(false);
+  const [newCostLabel, setNewCostLabel] = useState('');
 
   // New Edition modal state
   const [showNewEditionModal, setShowNewEditionModal] = useState(false);
@@ -119,7 +131,7 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
   const netCash = totalReceivedCash - totalPaidCash;
   const netTotal = netPix + netCash;
 
-  // Pending items list for Relatório de Pendentes para Cobrança
+  // Pending items list pulled directly from Geral (status === 'pendente') + Feirantes
   const pendingItems = participations
     .filter(p => {
       const ed = editions.find(e => e.id === p.editionId);
@@ -131,7 +143,7 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
       return {
         participation: p,
         edition: ed,
-        feirante: fr || { id: p.feiranteId, name: 'Feirante', stallType: '', defaultFee: p.amount, active: true },
+        feirante: fr || { id: p.feiranteId, name: 'Feirante', stallType: '', phone: '', defaultFee: p.amount, active: true },
       };
     })
     .sort((a, b) => b.edition.date.localeCompare(a.edition.date));
@@ -187,7 +199,7 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
     setEditingCell(null);
   };
 
-  const openExpenseEditor = (edition: FeiraEdition, cat: FeiraOrgExpense['category'], label: string) => {
+  const openExpenseEditor = (edition: FeiraEdition, cat: string, label: string) => {
     if (edition.status === 'cancelada') return;
     const existing = orgExpenses.find(e => e.editionId === edition.id && e.category === cat);
     setEditingExpenseCell({ edition, cat, label, existing });
@@ -233,6 +245,58 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
     );
     onUpdateOrgExpenses(updated);
     setEditingExpenseCell(null);
+  };
+
+  // Inline save for Feirante name in Geral table
+  const handleSaveInlineFrName = (frId: string) => {
+    if (inlineFrName.trim()) {
+      onUpdateFeirantes(
+        feirantes.map(f => (f.id === frId ? { ...f, name: inlineFrName.trim() } : f))
+      );
+    }
+    setEditingFrRowId(null);
+  };
+
+  // Inline save for Edition date in Geral table
+  const handleSaveInlineEdDate = (edId: string) => {
+    if (inlineEdDate) {
+      const newLabel = formatDateBR(inlineEdDate);
+      onUpdateEditions(
+        editions.map(ed => (ed.id === edId ? { ...ed, date: inlineEdDate, label: newLabel } : ed))
+      );
+    }
+    setEditingEdColId(null);
+  };
+
+  // Inline save for Cost category label in Geral table
+  const handleSaveInlineCostLabel = (catId: string) => {
+    if (inlineCostLabel.trim()) {
+      const trimmed = inlineCostLabel.trim();
+      onUpdateExpenseCategories(
+        expenseCategories.map(c => (c.id === catId ? { ...c, label: trimmed } : c))
+      );
+      onUpdateOrgExpenses(
+        orgExpenses.map(ex => (ex.category === catId ? { ...ex, description: trimmed } : ex))
+      );
+    }
+    setEditingCostRowId(null);
+  };
+
+  const handleCreateCostCategory = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCostLabel.trim()) return;
+    const id = `cost-${Date.now()}`;
+    const color = COLOR_PALETTE[expenseCategories.length % COLOR_PALETTE.length];
+    onUpdateExpenseCategories([...expenseCategories, { id, label: newCostLabel.trim(), color }]);
+    setNewCostLabel('');
+    setShowNewCostModal(false);
+  };
+
+  const handleDeleteCostCategory = (cat: FeiraExpenseCategoryItem) => {
+    if (confirm(`Excluir a linha de custo "${cat.label}" e todos os seus valores na planilha Geral?`)) {
+      onUpdateExpenseCategories(expenseCategories.filter(c => c.id !== cat.id));
+      onUpdateOrgExpenses(orgExpenses.filter(ex => ex.category !== cat.id));
+    }
   };
 
   const handleToggleEditionCancel = (edition: FeiraEdition) => {
@@ -296,7 +360,7 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
   };
 
   const handleDeletePending = (part: FeiraParticipation) => {
-    if (confirm('Deseja excluir esta cobrança pendente?')) {
+    if (confirm('Deseja excluir esta cobrança pendente da planilha Geral?')) {
       onUpdateParticipations(participations.filter(p => p.id !== part.id));
     }
   };
@@ -408,134 +472,124 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Header & KPIs */}
-      <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-neutral-800">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
-              Feira da Lua — Controle de Recebimentos, Pagamentos e Feirantes
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
-              Planilha matriz semanal por barraca, controle de pendências para cobrança e fechamento líquido (PIX e Dinheiro)
-            </p>
+      {/* Top Header & KPIs - somente na aba Geral */}
+      {activeSubTab === 'geral' && (
+        <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-slate-100 dark:border-neutral-800">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Feira da Lua — Controle de Recebimentos, Pagamentos e Feirantes
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
+                Planilha Geral editável por barraca e data, cobranças automáticas de pendentes e fechamento líquido (PIX e Dinheiro)
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <button
+                onClick={() => setShowNewEditionModal(true)}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-neutral-200 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 rounded-lg transition-colors whitespace-nowrap"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Nova Data de Feira
+              </button>
+
+              <button
+                onClick={handlePrintConsolidatedPDF}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors shadow-xs whitespace-nowrap"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Imprimir Relatório Geral (PDF)
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5 flex-wrap">
+          {/* 4 Consolidated KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+            <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+              <span className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase tracking-wider font-semibold">
+                Total de Feiras Realizadas
+              </span>
+              <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+                {realizedEditions.length}
+              </div>
+              <span className="text-[11px] text-slate-400 dark:text-neutral-500">
+                {editions.filter(e => e.status === 'cancelada').length} canceladas por clima
+              </span>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+              <span className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase tracking-wider font-semibold">
+                Total Dinheiro (Líq)
+              </span>
+              <div className={`text-2xl font-bold font-mono mt-1 ${netCash >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>
+                {formatCurrency(netCash)}
+              </div>
+              <span className="text-[11px] text-slate-400 dark:text-neutral-500 font-mono">
+                Entradas: {formatCurrency(totalReceivedCash)} · Saídas: {formatCurrency(totalPaidCash)}
+              </span>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+              <span className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase tracking-wider font-semibold">
+                Total PIX (Líq)
+              </span>
+              <div className={`text-2xl font-bold font-mono mt-1 ${netPix >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600'}`}>
+                {formatCurrency(netPix)}
+              </div>
+              <span className="text-[11px] text-slate-400 dark:text-neutral-500 font-mono">
+                Entradas: {formatCurrency(totalReceivedPix)} · Saídas: {formatCurrency(totalPaidPix)}
+              </span>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+              <span className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase tracking-wider font-semibold">
+                Saldo Líquido Geral
+              </span>
+              <div className={`text-2xl font-bold font-mono mt-1 ${netTotal >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600'}`}>
+                {formatCurrency(netTotal)}
+              </div>
+              <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold font-mono">
+                A receber (Pendente): {formatCurrency(totalPending)}
+              </span>
+            </div>
+          </div>
+
+          {/* Sub-tabs */}
+          <div className="mt-5 flex items-center gap-1 p-1 bg-slate-100 dark:bg-neutral-950 rounded-lg max-w-fit border border-transparent dark:border-neutral-800">
             <button
-              onClick={() => setShowNewEditionModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-neutral-200 bg-slate-100 dark:bg-neutral-800 hover:bg-slate-200 dark:hover:bg-neutral-700 rounded-lg transition-colors whitespace-nowrap"
+              onClick={() => onChangeSubTab('geral')}
+              className="px-3.5 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap shrink-0 bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-xs"
             >
-              <Plus className="w-3.5 h-3.5" />
-              Nova Data de Feira
+              <FileSpreadsheet className="w-3.5 h-3.5 inline mr-1.5" />
+              Geral (Recebimentos & Pagamentos)
             </button>
 
             <button
-              onClick={handlePrintConsolidatedPDF}
-              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors shadow-xs whitespace-nowrap"
+              onClick={() => onChangeSubTab('reports')}
+              className="px-3.5 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap shrink-0 text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white"
             >
-              <Printer className="w-3.5 h-3.5" />
-              Imprimir Relatório Geral (PDF)
+              <AlertCircle className="w-3.5 h-3.5 inline mr-1.5" />
+              Cobranças ({pendingItems.length})
+            </button>
+
+            <button
+              onClick={() => onChangeSubTab('feirantes')}
+              className="px-3.5 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap shrink-0 text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white"
+            >
+              <Users className="w-3.5 h-3.5 inline mr-1.5" />
+              Feirantes ({feirantes.length})
             </button>
           </div>
         </div>
+      )}
 
-        {/* 4 Consolidated KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
-          <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
-            <span className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase tracking-wider font-semibold">
-              Total de Feiras Realizadas
-            </span>
-            <div className="text-2xl font-bold font-mono text-slate-900 dark:text-white mt-1">
-              {realizedEditions.length}
-            </div>
-            <span className="text-[11px] text-slate-400 dark:text-neutral-500">
-              {editions.filter(e => e.status === 'cancelada').length} canceladas por clima
-            </span>
-          </div>
-
-          <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
-            <span className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase tracking-wider font-semibold">
-              Total Dinheiro (Líq)
-            </span>
-            <div className={`text-2xl font-bold font-mono mt-1 ${netCash >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>
-              {formatCurrency(netCash)}
-            </div>
-            <span className="text-[11px] text-slate-400 dark:text-neutral-500 font-mono">
-              Entradas: {formatCurrency(totalReceivedCash)} · Saídas: {formatCurrency(totalPaidCash)}
-            </span>
-          </div>
-
-          <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
-            <span className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase tracking-wider font-semibold">
-              Total PIX (Líq)
-            </span>
-            <div className={`text-2xl font-bold font-mono mt-1 ${netPix >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600'}`}>
-              {formatCurrency(netPix)}
-            </div>
-            <span className="text-[11px] text-slate-400 dark:text-neutral-500 font-mono">
-              Entradas: {formatCurrency(totalReceivedPix)} · Saídas: {formatCurrency(totalPaidPix)}
-            </span>
-          </div>
-
-          <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
-            <span className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase tracking-wider font-semibold">
-              Saldo Líquido Geral
-            </span>
-            <div className={`text-2xl font-bold font-mono mt-1 ${netTotal >= 0 ? 'text-slate-900 dark:text-white' : 'text-rose-600'}`}>
-              {formatCurrency(netTotal)}
-            </div>
-            <span className="text-[11px] text-amber-600 dark:text-amber-400 font-semibold font-mono">
-              A receber (Pendente): {formatCurrency(totalPending)}
-            </span>
-          </div>
-        </div>
-
-        {/* Sub-tabs */}
-        <div className="mt-5 flex items-center gap-1 p-1 bg-slate-100 dark:bg-neutral-950 rounded-lg max-w-fit border border-transparent dark:border-neutral-800">
-          <button
-            onClick={() => onChangeSubTab('matrix')}
-            className={`px-3.5 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap shrink-0 ${
-              activeSubTab === 'matrix'
-                ? 'bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 inline mr-1.5" />
-            Planilha Matriz (Recebimentos & Pagamentos)
-          </button>
-
-          <button
-            onClick={() => onChangeSubTab('reports')}
-            className={`px-3.5 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap shrink-0 ${
-              activeSubTab === 'reports'
-                ? 'bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <AlertCircle className="w-3.5 h-3.5 inline mr-1.5" />
-            Pendentes para Cobrança ({pendingItems.length})
-          </button>
-
-          <button
-            onClick={() => onChangeSubTab('feirantes')}
-            className={`px-3.5 py-1.5 text-xs font-medium rounded-md transition-all whitespace-nowrap shrink-0 ${
-              activeSubTab === 'feirantes'
-                ? 'bg-white dark:bg-neutral-800 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-neutral-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5 inline mr-1.5" />
-            Feirantes ({feirantes.length})
-          </button>
-        </div>
-      </div>
-
-      {/* SUB-TAB 1: PLANILHA MATRIZ */}
-      {activeSubTab === 'matrix' && (
+      {/* SUB-TAB 1: GERAL (PLANILHA EDITÁVEL COMPLETA) */}
+      {activeSubTab === 'geral' && (
         <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 shadow-sm overflow-hidden">
           <div className="px-5 py-3 bg-slate-50 dark:bg-neutral-950 border-b border-slate-200 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="font-semibold text-slate-700 dark:text-neutral-200">
-              Clique em qualquer célula para lançar, editar ou excluir pagamento/despesa:
+              Clique em qualquer célula, nome de feirante, data ou custo para editar ou excluir:
             </div>
             <div className="flex flex-wrap items-center gap-3 text-[11px] font-medium dark:text-neutral-300">
               <span className="flex items-center gap-1.5">
@@ -560,34 +614,79 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
             <table className="w-full border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-900 dark:bg-black text-white">
-                  <th className="sticky left-0 z-20 bg-slate-900 dark:bg-black py-2.5 px-3 text-left font-bold min-w-[175px] border-r border-slate-700 dark:border-neutral-800">
-                    Feirante / Barraca
+                  <th className="sticky left-0 z-20 bg-slate-900 dark:bg-black py-2.5 px-3 text-left font-bold min-w-[195px] border-r border-slate-700 dark:border-neutral-800">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>Feirante / Barraca</span>
+                      <button
+                        onClick={openNewFeiranteModal}
+                        className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded"
+                        title="Adicionar novo feirante"
+                      >
+                        + Barraca
+                      </button>
+                    </div>
                   </th>
                   {editions.map(ed => (
                     <th
                       key={ed.id}
-                      className={`py-2 px-2 text-center font-mono min-w-[100px] border-r border-slate-700/70 dark:border-neutral-800 ${
+                      className={`py-2 px-2 text-center font-mono min-w-[106px] border-r border-slate-700/70 dark:border-neutral-800 ${
                         ed.status === 'cancelada' ? 'bg-rose-700 text-white' : ''
                       }`}
                     >
-                      <div className="font-bold">{ed.label.slice(0, 5)}</div>
-                      <div className="text-[10px] opacity-75">{ed.label.slice(6)}</div>
-                      <div className="mt-1 flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => handleToggleEditionCancel(ed)}
-                          title={ed.status === 'cancelada' ? 'Reativar feira' : 'Marcar feira como cancelada'}
-                          className="text-[9px] underline opacity-80 hover:opacity-100"
-                        >
-                          {ed.status === 'cancelada' ? 'Reativar' : 'Cancelar'}
-                        </button>
-                        <button
-                          onClick={() => handleDeleteEdition(ed)}
-                          title="Excluir esta data da planilha"
-                          className="text-[9px] text-rose-300 hover:text-rose-100"
-                        >
-                          <Trash2 className="w-2.5 h-2.5 inline" />
-                        </button>
-                      </div>
+                      {editingEdColId === ed.id ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <input
+                            type="date"
+                            value={inlineEdDate}
+                            onChange={e => setInlineEdDate(e.target.value)}
+                            className="px-1 py-0.5 text-[10px] bg-white text-slate-900 rounded w-24"
+                          />
+                          <div className="flex gap-1">
+                            <button
+                              onClick={() => handleSaveInlineEdDate(ed.id)}
+                              className="px-1.5 py-0.5 bg-emerald-600 text-white rounded text-[9px]"
+                            >
+                              OK
+                            </button>
+                            <button
+                              onClick={() => setEditingEdColId(null)}
+                              className="px-1.5 py-0.5 bg-slate-700 text-white rounded text-[9px]"
+                            >
+                              X
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div
+                            onClick={() => {
+                              setEditingEdColId(ed.id);
+                              setInlineEdDate(ed.date);
+                            }}
+                            className="cursor-pointer hover:underline"
+                            title="Clique para editar a data"
+                          >
+                            <div className="font-bold">{ed.label.slice(0, 5)}</div>
+                            <div className="text-[10px] opacity-75">{ed.label.slice(6)}</div>
+                          </div>
+                          <div className="mt-1 flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => handleToggleEditionCancel(ed)}
+                              title={ed.status === 'cancelada' ? 'Reativar feira' : 'Marcar feira como cancelada'}
+                              className="text-[9px] underline opacity-80 hover:opacity-100"
+                            >
+                              {ed.status === 'cancelada' ? 'Reativar' : 'Cancelar'}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEdition(ed)}
+                              title="Excluir esta data da planilha"
+                              className="text-[9px] text-rose-300 hover:text-rose-100"
+                            >
+                              <Trash2 className="w-2.5 h-2.5 inline" />
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -596,9 +695,59 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
               <tbody className="divide-y divide-slate-200 dark:divide-neutral-800">
                 {feirantes.map(fr => (
                   <tr key={fr.id} className="hover:bg-slate-50/80 dark:hover:bg-neutral-800/40">
-                    <td className="sticky left-0 z-10 bg-white dark:bg-neutral-900 py-2 px-3 font-semibold text-slate-900 dark:text-white border-r border-slate-200 dark:border-neutral-800 truncate max-w-[185px]">
-                      <div>{fr.name}</div>
-                      <div className="text-[10px] font-normal text-slate-400 dark:text-neutral-500 truncate">{fr.stallType}</div>
+                    <td className="sticky left-0 z-10 bg-white dark:bg-neutral-900 py-2 px-3 font-semibold text-slate-900 dark:text-white border-r border-slate-200 dark:border-neutral-800 max-w-[205px]">
+                      {editingFrRowId === fr.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            autoFocus
+                            value={inlineFrName}
+                            onChange={e => setInlineFrName(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleSaveInlineFrName(fr.id);
+                              if (e.key === 'Escape') setEditingFrRowId(null);
+                            }}
+                            className="px-1.5 py-0.5 text-xs bg-slate-100 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 rounded w-28 text-slate-900 dark:text-white"
+                          />
+                          <button
+                            onClick={() => handleSaveInlineFrName(fr.id)}
+                            className="p-0.5 text-emerald-600"
+                            title="Salvar nome"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setEditingFrRowId(null)}
+                            className="p-0.5 text-slate-400"
+                            title="Cancelar"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-1 group">
+                          <div
+                            onClick={() => {
+                              setEditingFrRowId(fr.id);
+                              setInlineFrName(fr.name);
+                            }}
+                            className="truncate cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
+                            title="Clique para editar o nome da barraca"
+                          >
+                            <div>{fr.name}</div>
+                            <div className="text-[10px] font-normal text-slate-400 dark:text-neutral-500 truncate">
+                              {fr.stallType}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteFeirante(fr)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 transition-opacity shrink-0"
+                            title="Excluir feirante"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </td>
 
                     {editions.map(ed => {
@@ -700,7 +849,16 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
                 {/* PAGAMENTOS / DESPESAS DA FEIRA */}
                 <tr className="bg-amber-800 text-white font-bold">
                   <td className="sticky left-0 z-10 bg-amber-800 py-2 px-3 border-r border-amber-700">
-                    PAGAMENTOS / CUSTOS
+                    <div className="flex items-center justify-between gap-2">
+                      <span>PAGAMENTOS / CUSTOS</span>
+                      <button
+                        onClick={() => setShowNewCostModal(true)}
+                        className="px-1.5 py-0.5 text-[10px] font-semibold bg-amber-950 hover:bg-black text-white rounded"
+                        title="Adicionar nova linha de custo"
+                      >
+                        + Custo
+                      </button>
+                    </div>
                   </td>
                   {editions.map(ed => (
                     <td key={ed.id} className="py-2 px-2 text-center font-mono text-[11px] border-r border-amber-700">
@@ -709,10 +867,58 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
                   ))}
                 </tr>
 
-                {EXPENSE_ROWS.map(row => (
-                  <tr key={row.cat} className="bg-rose-50/30 dark:bg-rose-950/10 hover:bg-rose-50/70 dark:hover:bg-rose-950/25">
+                {expenseCategories.map(row => (
+                  <tr key={row.id} className="bg-rose-50/30 dark:bg-rose-950/10 hover:bg-rose-50/70 dark:hover:bg-rose-950/25">
                     <td className="sticky left-0 z-10 bg-white dark:bg-neutral-900 py-2 px-3 font-medium text-slate-800 dark:text-neutral-200 border-r border-slate-200 dark:border-neutral-800">
-                      {row.label}
+                      {editingCostRowId === row.id ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            autoFocus
+                            value={inlineCostLabel}
+                            onChange={e => setInlineCostLabel(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleSaveInlineCostLabel(row.id);
+                              if (e.key === 'Escape') setEditingCostRowId(null);
+                            }}
+                            className="px-1.5 py-0.5 text-xs bg-slate-100 dark:bg-neutral-800 border border-slate-300 dark:border-neutral-700 rounded w-28 text-slate-900 dark:text-white"
+                          />
+                          <button
+                            onClick={() => handleSaveInlineCostLabel(row.id)}
+                            className="p-0.5 text-emerald-600"
+                            title="Salvar nome do custo"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => setEditingCostRowId(null)}
+                            className="p-0.5 text-slate-400"
+                            title="Cancelar"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-1 group">
+                          <span
+                            onClick={() => {
+                              setEditingCostRowId(row.id);
+                              setInlineCostLabel(row.label);
+                            }}
+                            className="truncate cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
+                            title="Clique para renomear este custo"
+                          >
+                            {row.label}
+                          </span>
+                          <button
+                            onClick={() => handleDeleteCostCategory(row)}
+                            className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-600 transition-opacity shrink-0"
+                            title="Excluir linha de custo"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                     {editions.map(ed => {
                       if (ed.status === 'cancelada') {
@@ -725,12 +931,12 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
                           </td>
                         );
                       }
-                      const exp = orgExpenses.find(e => e.editionId === ed.id && e.category === row.cat);
+                      const exp = orgExpenses.find(e => e.editionId === ed.id && e.category === row.id);
                       const amt = exp?.amount || 0;
                       return (
                         <td
                           key={ed.id}
-                          onClick={() => openExpenseEditor(ed, row.cat, row.label)}
+                          onClick={() => openExpenseEditor(ed, row.id, row.label)}
                           className="py-2 px-1.5 text-center font-mono text-rose-900 dark:text-rose-300 border-r border-slate-200 dark:border-neutral-800 cursor-pointer hover:bg-rose-100/70 dark:hover:bg-rose-900/30"
                         >
                           {amt > 0 ? formatCurrency(amt) : 'R$ 0,00'}
@@ -794,16 +1000,16 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
         </div>
       )}
 
-      {/* SUB-TAB 2: RELATÓRIO DE PENDENTES PARA COBRANÇA */}
+      {/* SUB-TAB 2: COBRANÇAS (PUXA APENAS PENDENTES DA PLANILHA GERAL + CONTATO DE FEIRANTES) */}
       {activeSubTab === 'reports' && (
         <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-neutral-800">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Relatório de Pendentes para Cobrança
+                Cobranças Pendentes (Puxado da Planilha Geral & Feirantes)
               </h3>
               <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
-                Lista consolidada de feirantes com pagamento pendente para cobrança imediata, baixa ou exclusão
+                Exibe automaticamente todas as células marcadas como Pendente na planilha Geral com o contato do feirante
               </p>
             </div>
 
@@ -818,8 +1024,8 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
                 <tr className="border-b border-slate-200 dark:border-neutral-800 text-slate-500 dark:text-neutral-400 font-semibold uppercase text-[11px]">
                   <th className="py-3 px-3">Feira (Data)</th>
                   <th className="py-3 px-3">Feirante</th>
-                  <th className="py-3 px-3">Contato</th>
-                  <th className="py-3 px-3">Presença</th>
+                  <th className="py-3 px-3">Contato (Feirantes)</th>
+                  <th className="py-3 px-3">Status na Geral</th>
                   <th className="py-3 px-3 text-right">Valor Pendente</th>
                   <th className="py-3 px-3 text-right">Ações / Cobrança</th>
                 </tr>
@@ -828,7 +1034,7 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
                 {pendingItems.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-10 text-center text-slate-400 dark:text-neutral-500">
-                      Nenhuma pendência em aberto! Todos os feirantes estão em dia.
+                      Nenhuma célula marcada como Pendente na planilha Geral!
                     </td>
                   </tr>
                 ) : (
@@ -837,8 +1043,11 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
                       <td className="py-3 px-3 font-mono font-semibold text-slate-900 dark:text-white">
                         {edition.label}
                       </td>
-                      <td className="py-3 px-3 font-bold text-slate-900 dark:text-white">
-                        {feirante.name}
+                      <td className="py-3 px-3">
+                        <div className="font-bold text-slate-900 dark:text-white">{feirante.name}</div>
+                        {feirante.stallType && (
+                          <div className="text-[10px] text-slate-400 dark:text-neutral-500">{feirante.stallType}</div>
+                        )}
                       </td>
                       <td className="py-3 px-3">
                         {editingPhoneId === feirante.id ? (
@@ -882,7 +1091,7 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
                       </td>
                       <td className="py-3 px-3">
                         <span className="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 font-semibold text-[11px]">
-                          Presente
+                          Pendente
                         </span>
                       </td>
                       <td className="py-3 px-3 text-right font-mono font-bold text-rose-600 dark:text-rose-400">
@@ -893,14 +1102,14 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
                           <button
                             onClick={() => handleQuickSettlePending(participation, 'pago_pix')}
                             className="px-2 py-1 text-[11px] font-semibold bg-sky-50 text-sky-700 hover:bg-sky-100 dark:bg-sky-950/50 dark:text-sky-300 rounded transition-colors"
-                            title="Dar baixa como pago via PIX"
+                            title="Dar baixa como pago via PIX na planilha Geral"
                           >
                             Quitar PIX
                           </button>
                           <button
                             onClick={() => handleQuickSettlePending(participation, 'pago_dinheiro')}
                             className="px-2 py-1 text-[11px] font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:text-emerald-300 rounded transition-colors"
-                            title="Dar baixa como pago em Dinheiro"
+                            title="Dar baixa como pago em Dinheiro na planilha Geral"
                           >
                             Quitar Dinheiro
                           </button>
@@ -1010,7 +1219,7 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
                   </div>
 
                   <div className="mt-3 pt-2.5 border-t border-slate-200/70 dark:border-neutral-800 flex items-center justify-between text-xs">
-                    <span className="text-slate-500 dark:text-neutral-400">Pendências:</span>
+                    <span className="text-slate-500 dark:text-neutral-400">Pendências na Geral:</span>
                     {pendingForFeirante > 0 ? (
                       <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
                         {formatCurrency(pendingForFeirante)}
@@ -1026,7 +1235,7 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
         </div>
       )}
 
-      {/* MODAL: EDITAR / EXCLUIR CÉLULA DE FEIRANTE NA MATRIZ */}
+      {/* MODAL: EDITAR / EXCLUIR CÉLULA DE FEIRANTE NA PLANILHA GERAL */}
       {editingCell && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 max-w-md w-full p-6 shadow-xl">
@@ -1215,6 +1424,53 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
         </div>
       )}
 
+      {/* MODAL: NOVA LINHA DE CUSTO */}
+      {showNewCostModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 max-w-sm w-full p-6 shadow-xl">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+              Nova Linha de Custo / Pagamento
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-neutral-400 mb-4">
+              Adicione uma nova categoria de despesa na planilha Geral
+            </p>
+
+            <form onSubmit={handleCreateCostCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 dark:text-neutral-300 mb-1">
+                  Nome do Custo
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="Ex: Limpeza, Divulgação, Aluguel Tenda..."
+                  value={newCostLabel}
+                  onChange={e => setNewCostLabel(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-neutral-800">
+                <button
+                  type="button"
+                  onClick={() => setShowNewCostModal(false)}
+                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-neutral-300 hover:bg-slate-100 dark:hover:bg-neutral-800 rounded-lg"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg"
+                >
+                  Adicionar Custo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: NOVA EDIÇÃO DE FEIRA */}
       {showNewEditionModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -1223,7 +1479,7 @@ export const FeiraManagement: React.FC<FeiraManagementProps> = ({
               Nova Edição da Feira
             </h3>
             <p className="text-xs text-slate-500 dark:text-neutral-400 mb-4">
-              Adicione uma nova coluna de data na planilha matriz para lançar os recebimentos e despesas
+              Adicione uma nova coluna de data na planilha Geral para lançar os recebimentos e despesas
             </p>
 
             <form onSubmit={handleCreateEdition} className="space-y-4">

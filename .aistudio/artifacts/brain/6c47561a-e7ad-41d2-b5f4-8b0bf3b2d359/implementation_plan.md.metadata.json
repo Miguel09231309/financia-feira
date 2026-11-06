@@ -1,0 +1,6 @@
+{
+  "summary": "Implementation plan for Feira da Lua financial management: removing Backup, renaming Planilha Matriz to Geral with full inline and click editing, syncing Cobranças and Gráficos & Custos directly from Geral and Feirantes, and updating both the web app and standalone index.html.",
+  "updatedAt": "2026-11-06T11:24:37.743429400Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

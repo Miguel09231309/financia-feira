@@ -11,6 +11,7 @@ import {
   FeiraEdition,
   FeiraParticipation,
   FeiraOrgExpense,
+  FeiraExpenseCategoryItem,
 } from '../types/finance';
 
 const STORAGE_KEYS = {
@@ -26,6 +27,7 @@ const STORAGE_KEYS = {
   FEIRA_EDITIONS: 'finanzen_feira_editions_v1',
   FEIRA_PARTICIPATIONS: 'finanzen_feira_participations_v1',
   FEIRA_ORG_EXPENSES: 'finanzen_feira_org_expenses_v1',
+  FEIRA_EXPENSE_CATEGORIES: 'finanzen_feira_expense_categories_v1',
 };
 
 // Data do contexto: 2026-11-03
@@ -806,9 +808,35 @@ export const storageService = {
   saveFeiraOrgExpenses(data: FeiraOrgExpense[]): void {
     localStorage.setItem(STORAGE_KEYS.FEIRA_ORG_EXPENSES, JSON.stringify(data));
   },
+
+  getFeiraExpenseCategories(): FeiraExpenseCategoryItem[] {
+    const raw = localStorage.getItem(STORAGE_KEYS.FEIRA_EXPENSE_CATEGORIES);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.FEIRA_EXPENSE_CATEGORIES, JSON.stringify(INITIAL_FEIRA_EXPENSE_CATEGORIES));
+      return INITIAL_FEIRA_EXPENSE_CATEGORIES;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return INITIAL_FEIRA_EXPENSE_CATEGORIES;
+    }
+  },
+
+  saveFeiraExpenseCategories(data: FeiraExpenseCategoryItem[]): void {
+    localStorage.setItem(STORAGE_KEYS.FEIRA_EXPENSE_CATEGORIES, JSON.stringify(data));
+  },
 };
 
-// --- Seed Data for Feira da Lua (Planilha Matriz & Cobranças) ---
+export const INITIAL_FEIRA_EXPENSE_CATEGORIES: FeiraExpenseCategoryItem[] = [
+  { id: 'som', label: 'Som & Música ao Vivo', color: '#3B82F6' },
+  { id: 'seguranca', label: 'Segurança & Apoio', color: '#EC4899' },
+  { id: 'banheiro', label: 'Banheiro Químico', color: '#F59E0B' },
+  { id: 'energia', label: 'Energia & Gerador', color: '#10B981' },
+  { id: 'coordenacao', label: 'Coordenação & Equipe', color: '#8B5CF6' },
+  { id: 'extras', label: 'Extras / Manutenção', color: '#64748B' },
+];
+
+// --- Seed Data for Feira da Lua (Geral & Cobranças) ---
 export const INITIAL_FEIRANTES: Feirante[] = [
   { id: 'fr-1', name: 'Cachorro Quente', stallType: 'Lanches & Hot Dog', phone: '', defaultFee: 55, active: true },
   { id: 'fr-2', name: 'Pastelaria Sabor', stallType: 'Pastéis & Caldo', phone: '(41) 99812-3401', defaultFee: 55, active: true },

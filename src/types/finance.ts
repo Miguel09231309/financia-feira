@@ -165,12 +165,19 @@ export interface FeiraParticipation {
   note?: string;
 }
 
+export interface FeiraExpenseCategoryItem {
+  id: string;
+  label: string;
+  color: string;
+}
+
 export interface FeiraOrgExpense {
   id: string;
   editionId: string;
   description: string;
-  category: 'som' | 'seguranca' | 'banheiro' | 'energia' | 'coordenacao' | 'extras';
+  category: string;
   amount: number;
   paymentMethod: 'pix' | 'dinheiro';
 }
+
 

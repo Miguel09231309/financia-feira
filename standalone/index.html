@@ -56,12 +56,8 @@
     const PencilIcon = ({ className }) => <Icon className={className}><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></Icon>;
     const MoonIcon = ({ className }) => <Icon className={className}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></Icon>;
     const SunIcon = ({ className }) => <Icon className={className}><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></Icon>;
-    const LockIcon = ({ className }) => <Icon className={className}><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
     const CheckIcon = ({ className }) => <Icon className={className}><path d="M20 6 9 17l-5-5"/></Icon>;
     const XIcon = ({ className }) => <Icon className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></Icon>;
-    const DownloadIcon = ({ className }) => <Icon className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></Icon>;
-    const UploadIcon = ({ className }) => <Icon className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></Icon>;
-    const ShieldIcon = ({ className }) => <Icon className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></Icon>;
     const MessageIcon = ({ className }) => <Icon className={className}><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></Icon>;
 
     // --- Formatters ---
@@ -75,14 +71,16 @@
       return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
     };
 
+    const COLOR_PALETTE = ['#3B82F6', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6', '#06B6D4', '#F97316', '#64748B'];
+
     // --- Storage Keys & Seed Data ---
     const KEYS = {
       FEIRANTES: 'feiralua_feirantes_v1',
       EDITIONS: 'feiralua_editions_v1',
       PARTICIPATIONS: 'feiralua_participations_v1',
       EXPENSES: 'feiralua_expenses_v1',
+      EXPENSE_CATS: 'feiralua_exp_cats_v1',
       THEME: 'feiralua_dark_v1',
-      PIN: 'feiralua_pin_v1',
     };
 
     const INITIAL_FEIRANTES = [
@@ -118,6 +116,15 @@
       { id: 'ed-06-08', date: '2026-08-06', label: '06/08/2026', status: 'realizada', sistOk: true },
       { id: 'ed-30-07', date: '2026-07-30', label: '30/07/2026', status: 'realizada', sistOk: true },
       { id: 'ed-23-07', date: '2026-07-23', label: '23/07/2026', status: 'realizada', sistOk: true },
+    ];
+
+    const INITIAL_EXPENSE_CATS = [
+      { id: 'som', label: 'Som & Música ao Vivo', color: '#3B82F6' },
+      { id: 'seguranca', label: 'Segurança & Apoio', color: '#EC4899' },
+      { id: 'banheiro', label: 'Banheiro Químico', color: '#F59E0B' },
+      { id: 'energia', label: 'Energia & Gerador', color: '#10B981' },
+      { id: 'coordenacao', label: 'Coordenação & Equipe', color: '#8B5CF6' },
+      { id: 'extras', label: 'Extras / Manutenção', color: '#64748B' },
     ];
 
     function buildInitialParticipations() {
@@ -175,15 +182,6 @@
       return list;
     }
 
-    const EXPENSE_ROWS = [
-      { cat: 'som', label: 'Som & Música ao Vivo', color: '#3B82F6' },
-      { cat: 'seguranca', label: 'Segurança & Apoio', color: '#EC4899' },
-      { cat: 'banheiro', label: 'Banheiro Químico', color: '#F59E0B' },
-      { cat: 'energia', label: 'Energia & Gerador', color: '#10B981' },
-      { cat: 'coordenacao', label: 'Coordenação & Equipe', color: '#8B5CF6' },
-      { cat: 'extras', label: 'Extras / Manutenção', color: '#64748B' },
-    ];
-
     function loadState(key, fallbackFn) {
       try {
         const raw = localStorage.getItem(key);
@@ -203,13 +201,23 @@
       const [editions, setEditions] = useState(() => loadState(KEYS.EDITIONS, () => INITIAL_EDITIONS));
       const [participations, setParticipations] = useState(() => loadState(KEYS.PARTICIPATIONS, buildInitialParticipations));
       const [orgExpenses, setOrgExpenses] = useState(() => loadState(KEYS.EXPENSES, buildInitialExpenses));
+      const [expenseCats, setExpenseCats] = useState(() => loadState(KEYS.EXPENSE_CATS, () => INITIAL_EXPENSE_CATS));
       const [isDark, setIsDark] = useState(() => localStorage.getItem(KEYS.THEME) === 'true');
-      const [vaultPin, setVaultPin] = useState(() => localStorage.getItem(KEYS.PIN) || '');
-      const [isLocked, setIsLocked] = useState(() => Boolean(localStorage.getItem(KEYS.PIN)));
-      const [pinAttempt, setPinAttempt] = useState('');
-      const [pinError, setPinError] = useState(false);
 
-      const [tab, setTab] = useState('matrix'); // 'matrix' | 'reports' | 'feirantes' | 'charts' | 'backup'
+      const [tab, setTab] = useState('geral'); // 'geral' | 'reports' | 'feirantes' | 'charts'
+
+      // Inline editing in Geral
+      const [editingFrRowId, setEditingFrRowId] = useState(null);
+      const [inlineFrName, setInlineFrName] = useState('');
+
+      const [editingEdColId, setEditingEdColId] = useState(null);
+      const [inlineEdDate, setInlineEdDate] = useState('');
+
+      const [editingCatId, setEditingCatId] = useState(null);
+      const [inlineCatLabel, setInlineCatLabel] = useState('');
+
+      const [showAddCat, setShowAddCat] = useState(false);
+      const [newCatLabel, setNewCatLabel] = useState('');
 
       // Modals
       const [editingCell, setEditingCell] = useState(null);
@@ -233,7 +241,6 @@
 
       const [editingPhoneId, setEditingPhoneId] = useState(null);
       const [inlinePhone, setInlinePhone] = useState('');
-      const [newPinInput, setNewPinInput] = useState('');
 
       useEffect(() => {
         document.documentElement.classList.toggle('dark', isDark);
@@ -244,8 +251,9 @@
       const saveEditions = (d) => { setEditions(d); localStorage.setItem(KEYS.EDITIONS, JSON.stringify(d)); };
       const saveParticipations = (d) => { setParticipations(d); localStorage.setItem(KEYS.PARTICIPATIONS, JSON.stringify(d)); };
       const saveOrgExpenses = (d) => { setOrgExpenses(d); localStorage.setItem(KEYS.EXPENSES, JSON.stringify(d)); };
+      const saveExpenseCats = (d) => { setExpenseCats(d); localStorage.setItem(KEYS.EXPENSE_CATS, JSON.stringify(d)); };
 
-      // Metrics
+      // Metrics pulled from Geral
       const realizedEditions = editions.filter(e => e.status === 'realizada');
       let totalReceivedPix = 0, totalReceivedCash = 0, totalPending = 0;
       participations.forEach(p => {
@@ -268,6 +276,7 @@
       const netCash = totalReceivedCash - totalPaidCash;
       const netTotal = netPix + netCash;
 
+      // Cobranças: ONLY cells marked as 'pendente' in Geral, crossed with Feirantes
       const pendingItems = participations
         .filter(p => {
           const ed = editions.find(e => e.id === p.editionId);
@@ -276,7 +285,7 @@
         .map(p => ({
           participation: p,
           edition: editions.find(e => e.id === p.editionId),
-          feirante: feirantes.find(f => f.id === p.feiranteId) || { id: p.feiranteId, name: 'Feirante', phone: '' },
+          feirante: feirantes.find(f => f.id === p.feiranteId) || { id: p.feiranteId, name: 'Feirante', stallType: '', phone: '' },
         }))
         .sort((a, b) => b.edition.date.localeCompare(a.edition.date));
 
@@ -319,7 +328,7 @@
       // Expense cell handlers
       const openExpCell = (ed, row) => {
         if (ed.status === 'cancelada') return;
-        const ex = orgExpenses.find(item => item.editionId === ed.id && item.category === row.cat);
+        const ex = orgExpenses.find(item => item.editionId === ed.id && item.category === row.id);
         setEditingExp({ ed, row });
         setExpAmount(ex ? String(ex.amount) : '0');
         setExpMethod(ex?.paymentMethod || 'pix');
@@ -328,17 +337,17 @@
       const saveExpCell = (e) => {
         e.preventDefault();
         const amt = parseFloat(expAmount) || 0;
-        const idx = orgExpenses.findIndex(item => item.editionId === editingExp.ed.id && item.category === editingExp.row.cat);
+        const idx = orgExpenses.findIndex(item => item.editionId === editingExp.ed.id && item.category === editingExp.row.id);
         if (idx >= 0) {
           const next = [...orgExpenses];
           next[idx] = { ...next[idx], amount: amt, paymentMethod: expMethod };
           saveOrgExpenses(next);
         } else {
           saveOrgExpenses([...orgExpenses, {
-            id: `orgexp-${editingExp.ed.id}-${editingExp.row.cat}-${Date.now()}`,
+            id: `orgexp-${editingExp.ed.id}-${editingExp.row.id}-${Date.now()}`,
             editionId: editingExp.ed.id,
             description: editingExp.row.label,
-            category: editingExp.row.cat,
+            category: editingExp.row.id,
             amount: amt,
             paymentMethod: expMethod,
           }]);
@@ -347,8 +356,45 @@
       };
 
       const deleteExpCell = () => {
-        saveOrgExpenses(orgExpenses.filter(item => !(item.editionId === editingExp.ed.id && item.category === editingExp.row.cat)));
+        saveOrgExpenses(orgExpenses.filter(item => !(item.editionId === editingExp.ed.id && item.category === editingExp.row.id)));
         setEditingExp(null);
+      };
+
+      // Add / Rename / Delete Cost Row in Geral
+      const handleAddCostRow = (e) => {
+        e.preventDefault();
+        if (!newCatLabel.trim()) return;
+        const id = `cat-${Date.now()}`;
+        const color = COLOR_PALETTE[expenseCats.length % COLOR_PALETTE.length];
+        saveExpenseCats([...expenseCats, { id, label: newCatLabel.trim(), color }]);
+        setNewCatLabel('');
+        setShowAddCat(false);
+      };
+
+      const handleSaveCatLabel = (catId) => {
+        if (!inlineCatLabel.trim()) return;
+        saveExpenseCats(expenseCats.map(c => c.id === catId ? { ...c, label: inlineCatLabel.trim() } : c));
+        saveOrgExpenses(orgExpenses.map(ex => ex.category === catId ? { ...ex, description: inlineCatLabel.trim() } : ex));
+        setEditingCatId(null);
+      };
+
+      const handleDeleteCostRow = (cat) => {
+        if (!confirm(`Excluir a linha de custo "${cat.label}" e todos os seus lançamentos?`)) return;
+        saveExpenseCats(expenseCats.filter(c => c.id !== cat.id));
+        saveOrgExpenses(orgExpenses.filter(ex => ex.category !== cat.id));
+      };
+
+      // Inline Feirante Name & Edition Date in Geral
+      const handleSaveInlineFrName = (frId) => {
+        if (!inlineFrName.trim()) return;
+        saveFeirantes(feirantes.map(f => f.id === frId ? { ...f, name: inlineFrName.trim() } : f));
+        setEditingFrRowId(null);
+      };
+
+      const handleSaveInlineEdDate = (edId) => {
+        if (!inlineEdDate) return;
+        saveEditions(editions.map(ed => ed.id === edId ? { ...ed, date: inlineEdDate, label: formatDateBR(inlineEdDate) } : ed));
+        setEditingEdColId(null);
       };
 
       // Print PDF
@@ -384,57 +430,29 @@
         if (w) { w.document.write(html); w.document.close(); setTimeout(() => { w.focus(); w.print(); }, 400); }
       };
 
-      // Export / Import JSON Backup
-      const handleDownloadBackup = () => {
-        const payload = JSON.stringify({ app: 'Feira da Lua', date: new Date().toISOString(), feirantes, editions, participations, orgExpenses }, null, 2);
-        const blob = new Blob([payload], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `feira_da_lua_backup_${new Date().toISOString().slice(0, 10)}.json`;
-        a.click();
-      };
+      // Cost breakdown pulled from Geral
+      const totalOrgExpensesAll = orgExpenses.reduce((sum, e) => {
+        const ed = editions.find(item => item.id === e.editionId);
+        if (!ed || ed.status === 'cancelada') return sum;
+        return sum + e.amount;
+      }, 0);
 
-      const handleRestoreBackup = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          try {
-            const parsed = JSON.parse(ev.target.result);
-            if (parsed.feirantes) saveFeirantes(parsed.feirantes);
-            if (parsed.editions) saveEditions(parsed.editions);
-            if (parsed.participations) saveParticipations(parsed.participations);
-            if (parsed.orgExpenses) saveOrgExpenses(parsed.orgExpenses);
-            alert('Backup restaurado com sucesso!');
-          } catch {
-            alert('Arquivo de backup inválido.');
-          }
-        };
-        reader.readAsText(file);
-      };
-
-      if (isLocked && vaultPin) {
-        return (
-          <div className="min-h-screen bg-black flex items-center justify-center p-4 text-white">
-            <div className="max-w-sm w-full bg-neutral-900 rounded-2xl p-8 border border-neutral-800 text-center space-y-5">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto"><LockIcon className="w-6 h-6" /></div>
-              <h1 className="text-lg font-bold">Feira da Lua Bloqueada</h1>
-              <form onSubmit={(e) => { e.preventDefault(); if (pinAttempt === vaultPin) { setIsLocked(false); setPinAttempt(''); setPinError(false); } else setPinError(true); }} className="space-y-4">
-                <input type="password" maxLength={6} autoFocus placeholder="••••" value={pinAttempt} onChange={e => setPinAttempt(e.target.value.replace(/\D/g, ''))} className="w-full text-center text-2xl tracking-[0.5em] py-2 bg-black border border-neutral-800 rounded-xl font-mono text-white" />
-                {pinError && <div className="text-xs text-rose-400">PIN incorreto</div>}
-                <button type="submit" className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 rounded-xl font-bold text-sm">Desbloquear</button>
-              </form>
-            </div>
-          </div>
-        );
-      }
+      const categoryTotals = expenseCats.map(cat => {
+        const total = orgExpenses
+          .filter(e => {
+            const ed = editions.find(item => item.id === e.editionId);
+            return ed && ed.status !== 'cancelada' && e.category === cat.id;
+          })
+          .reduce((s, e) => s + e.amount, 0);
+        return { ...cat, total };
+      }).sort((a, b) => b.total - a.total);
 
       return (
         <div className="min-h-screen flex flex-col">
           {/* Top Bar */}
           <header className="sticky top-0 z-40 bg-white/95 dark:bg-neutral-950/95 backdrop-blur-md border-b border-slate-200 dark:border-neutral-800 no-print">
             <div className="max-w-7xl mx-auto flex items-center justify-between gap-6 px-4 sm:px-6 py-3.5">
-              <button onClick={() => setTab('matrix')} className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0 flex items-center gap-1.5">
+              <button onClick={() => setTab('geral')} className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white whitespace-nowrap shrink-0 flex items-center gap-1.5">
                 <span>Feira da Lua</span>
                 <span className="text-emerald-500">·</span>
                 <span className="text-xs font-semibold text-slate-500 dark:text-neutral-400 uppercase tracking-widest hidden sm:inline">Gestão Financeira</span>
@@ -442,11 +460,10 @@
 
               <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-neutral-300">
                 {[
-                  { id: 'matrix', label: 'Planilha Matriz' },
+                  { id: 'geral', label: 'Geral' },
                   { id: 'reports', label: `Cobranças (${pendingItems.length})` },
                   { id: 'feirantes', label: 'Feirantes' },
                   { id: 'charts', label: 'Gráficos & Custos' },
-                  { id: 'backup', label: 'Backup & PIN' },
                 ].map(item => (
                   <button
                     key={item.id}
@@ -466,11 +483,6 @@
                   {isDark ? <SunIcon className="w-3.5 h-3.5 text-amber-400" /> : <MoonIcon className="w-3.5 h-3.5 text-slate-600" />}
                   <span>{isDark ? 'Fundo Claro' : 'Fundo Preto'}</span>
                 </button>
-                {vaultPin && (
-                  <button onClick={() => setIsLocked(true)} className="p-2 text-slate-500 dark:text-neutral-400 hover:text-white rounded-lg" title="Bloquear tela">
-                    <LockIcon className="w-4 h-4" />
-                  </button>
-                )}
                 <button onClick={handlePrintPDF} className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg whitespace-nowrap">
                   <PrinterIcon className="w-3.5 h-3.5" />
                   Exportar PDF
@@ -481,45 +493,47 @@
 
           {/* Main Content */}
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-            {/* KPIs */}
-            <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-neutral-800">
-                <div>
-                  <h1 className="text-lg font-bold text-slate-900 dark:text-white">Feira da Lua — Controle Financeiro</h1>
-                  <p className="text-xs text-slate-500 dark:text-neutral-400">Recebimentos por barraca, custos da feira, cobranças pendentes e fechamento PIX / Dinheiro</p>
+            {/* KPIs - somente na aba Geral */}
+            {tab === 'geral' && (
+              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-neutral-800">
+                  <div>
+                    <h1 className="text-lg font-bold text-slate-900 dark:text-white">Feira da Lua — Controle Financeiro</h1>
+                    <p className="text-xs text-slate-500 dark:text-neutral-400">Recebimentos por barraca, custos da feira, cobranças pendentes e fechamento PIX / Dinheiro</p>
+                  </div>
+                  <button onClick={() => setShowNewEd(true)} className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg self-start sm:self-auto">
+                    <PlusIcon className="w-3.5 h-3.5" />
+                    Nova Data de Feira
+                  </button>
                 </div>
-                <button onClick={() => setShowNewEd(true)} className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg self-start sm:self-auto">
-                  <PlusIcon className="w-3.5 h-3.5" />
-                  Nova Data de Feira
-                </button>
-              </div>
 
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
-                <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
-                  <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Total de Feiras</div>
-                  <div className="text-2xl font-bold font-mono mt-1">{realizedEditions.length}</div>
-                </div>
-                <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
-                  <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Total Dinheiro (Líq)</div>
-                  <div className={`text-2xl font-bold font-mono mt-1 ${netCash >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>{formatCurrency(netCash)}</div>
-                </div>
-                <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
-                  <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Total PIX (Líq)</div>
-                  <div className={`text-2xl font-bold font-mono mt-1 ${netPix >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600'}`}>{formatCurrency(netPix)}</div>
-                </div>
-                <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
-                  <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Saldo Líquido Geral</div>
-                  <div className="text-2xl font-bold font-mono mt-1">{formatCurrency(netTotal)}</div>
-                  <div className="text-[11px] text-amber-600 dark:text-amber-400 font-mono font-semibold">Pendente: {formatCurrency(totalPending)}</div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-5">
+                  <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+                    <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Total de Feiras</div>
+                    <div className="text-2xl font-bold font-mono mt-1">{realizedEditions.length}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+                    <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Total Dinheiro (Líq)</div>
+                    <div className={`text-2xl font-bold font-mono mt-1 ${netCash >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600'}`}>{formatCurrency(netCash)}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+                    <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Total PIX (Líq)</div>
+                    <div className={`text-2xl font-bold font-mono mt-1 ${netPix >= 0 ? 'text-sky-600 dark:text-sky-400' : 'text-rose-600'}`}>{formatCurrency(netPix)}</div>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-neutral-950 p-4 rounded-xl border border-slate-100 dark:border-neutral-800">
+                    <div className="text-[11px] text-slate-500 dark:text-neutral-400 uppercase font-semibold">Saldo Líquido Geral</div>
+                    <div className="text-2xl font-bold font-mono mt-1">{formatCurrency(netTotal)}</div>
+                    <div className="text-[11px] text-amber-600 dark:text-amber-400 font-mono font-semibold">Pendente: {formatCurrency(totalPending)}</div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* TAB: PLANILHA MATRIZ */}
-            {tab === 'matrix' && (
+            {/* TAB: GERAL */}
+            {tab === 'geral' && (
               <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 shadow-sm overflow-hidden">
                 <div className="px-5 py-3 bg-slate-50 dark:bg-neutral-950 border-b border-slate-200 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <span className="font-semibold">Clique em qualquer célula para editar ou excluir o lançamento:</span>
+                  <span className="font-semibold">Clique em qualquer célula, nome, data ou custo para editar ou excluir direto na tabela:</span>
                   <div className="flex flex-wrap items-center gap-3 text-[11px]">
                     <span className="flex items-center gap-1"><span className="w-3 h-3 bg-sky-100 dark:bg-sky-900 border border-sky-400 inline-block"></span> Pago PIX</span>
                     <span className="flex items-center gap-1"><span className="w-3 h-3 bg-emerald-100 dark:bg-emerald-900 border border-emerald-400 inline-block"></span> Pago Dinheiro</span>
@@ -532,27 +546,83 @@
                   <table className="w-full border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-900 dark:bg-black text-white">
-                        <th className="sticky left-0 z-20 bg-slate-900 dark:bg-black py-2.5 px-3 text-left font-bold min-w-[170px] border-r border-slate-700 dark:border-neutral-800">Feirante</th>
+                        <th className="sticky left-0 z-20 bg-slate-900 dark:bg-black py-2.5 px-3 text-left font-bold min-w-[200px] border-r border-slate-700 dark:border-neutral-800">Feirante</th>
                         {editions.map(ed => (
-                          <th key={ed.id} className={`py-2 px-2 text-center font-mono min-w-[96px] border-r border-slate-700 dark:border-neutral-800 ${ed.status === 'cancelada' ? 'bg-rose-700' : ''}`}>
-                            <div className="font-bold">{ed.label.slice(0, 5)}</div>
-                            <div className="text-[10px] opacity-75">{ed.label.slice(6)}</div>
-                            <div className="mt-1 flex items-center justify-center gap-2">
-                              <button onClick={() => saveEditions(editions.map(item => item.id === ed.id ? { ...item, status: item.status === 'cancelada' ? 'realizada' : 'cancelada' } : item))} className="text-[9px] underline opacity-80 hover:opacity-100">
-                                {ed.status === 'cancelada' ? 'Reativar' : 'Cancelar'}
-                              </button>
-                              <button onClick={() => { if (confirm(`Excluir data ${ed.label}?`)) { saveEditions(editions.filter(x => x.id !== ed.id)); saveParticipations(participations.filter(p => p.editionId !== ed.id)); saveOrgExpenses(orgExpenses.filter(o => o.editionId !== ed.id)); } }} className="text-[9px] text-rose-300 hover:text-rose-100">
-                                <TrashIcon className="w-2.5 h-2.5 inline" />
-                              </button>
-                            </div>
+                          <th key={ed.id} className={`py-2 px-2 text-center font-mono min-w-[105px] border-r border-slate-700 dark:border-neutral-800 ${ed.status === 'cancelada' ? 'bg-rose-700' : ''}`}>
+                            {editingEdColId === ed.id ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <input
+                                  type="date"
+                                  value={inlineEdDate}
+                                  onChange={e => setInlineEdDate(e.target.value)}
+                                  className="w-24 px-1 py-0.5 text-[10px] bg-white text-slate-900 rounded"
+                                />
+                                <div className="flex items-center gap-1">
+                                  <button onClick={() => handleSaveInlineEdDate(ed.id)} className="px-1.5 py-0.5 bg-emerald-600 text-white rounded text-[9px]">OK</button>
+                                  <button onClick={() => setEditingEdColId(null)} className="px-1.5 py-0.5 bg-slate-700 text-white rounded text-[9px]">X</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div
+                                  onClick={() => { setEditingEdColId(ed.id); setInlineEdDate(ed.date); }}
+                                  className="cursor-pointer hover:underline"
+                                  title="Clique para editar a data"
+                                >
+                                  <div className="font-bold">{ed.label.slice(0, 5)}</div>
+                                  <div className="text-[10px] opacity-75">{ed.label.slice(6)}</div>
+                                </div>
+                                <div className="mt-1 flex items-center justify-center gap-2">
+                                  <button onClick={() => saveEditions(editions.map(item => item.id === ed.id ? { ...item, status: item.status === 'cancelada' ? 'realizada' : 'cancelada' } : item))} className="text-[9px] underline opacity-80 hover:opacity-100">
+                                    {ed.status === 'cancelada' ? 'Reativar' : 'Cancelar'}
+                                  </button>
+                                  <button onClick={() => { if (confirm(`Excluir data ${ed.label}?`)) { saveEditions(editions.filter(x => x.id !== ed.id)); saveParticipations(participations.filter(p => p.editionId !== ed.id)); saveOrgExpenses(orgExpenses.filter(o => o.editionId !== ed.id)); } }} className="text-[9px] text-rose-300 hover:text-rose-100" title="Excluir data">
+                                    <TrashIcon className="w-2.5 h-2.5 inline" />
+                                  </button>
+                                </div>
+                              </>
+                            )}
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-neutral-800">
                       {feirantes.map(fr => (
-                        <tr key={fr.id} className="hover:bg-slate-50/80 dark:hover:bg-neutral-800/40">
-                          <td className="sticky left-0 z-10 bg-white dark:bg-neutral-900 py-2 px-3 font-semibold border-r border-slate-200 dark:border-neutral-800 truncate max-w-[180px]">{fr.name}</td>
+                        <tr key={fr.id} className="hover:bg-slate-50/80 dark:hover:bg-neutral-800/40 group">
+                          <td className="sticky left-0 z-10 bg-white dark:bg-neutral-900 py-2 px-3 font-semibold border-r border-slate-200 dark:border-neutral-800 max-w-[210px]">
+                            {editingFrRowId === fr.id ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={inlineFrName}
+                                  onChange={e => setInlineFrName(e.target.value)}
+                                  onKeyDown={e => e.key === 'Enter' && handleSaveInlineFrName(fr.id)}
+                                  autoFocus
+                                  className="w-full px-1.5 py-0.5 text-xs bg-slate-50 dark:bg-neutral-800 border border-emerald-500 rounded"
+                                />
+                                <button onClick={() => handleSaveInlineFrName(fr.id)} className="text-emerald-500"><CheckIcon className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => setEditingFrRowId(null)} className="text-slate-400"><XIcon className="w-3.5 h-3.5" /></button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  onClick={() => { setEditingFrRowId(fr.id); setInlineFrName(fr.name); }}
+                                  className="truncate cursor-pointer hover:text-emerald-600 dark:hover:text-emerald-400"
+                                  title="Clique para editar nome"
+                                >
+                                  {fr.name}
+                                </span>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                  <button onClick={() => { setEditingFrRowId(fr.id); setInlineFrName(fr.name); }} className="text-slate-400 hover:text-emerald-500" title="Renomear">
+                                    <PencilIcon className="w-3 h-3" />
+                                  </button>
+                                  <button onClick={() => { if (confirm(`Excluir feirante ${fr.name}?`)) { saveFeirantes(feirantes.filter(x => x.id !== fr.id)); saveParticipations(participations.filter(p => p.feiranteId !== fr.id)); } }} className="text-slate-400 hover:text-rose-500" title="Excluir feirante">
+                                    <TrashIcon className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </td>
                           {editions.map(ed => {
                             if (ed.status === 'cancelada') return <td key={ed.id} className="bg-rose-600 text-white text-center font-bold text-[10px] py-2 px-1 border-r border-rose-500">CANCELADO</td>;
                             const part = participations.find(p => p.editionId === ed.id && p.feiranteId === fr.id);
@@ -582,16 +652,79 @@
                       </tr>
 
                       <tr className="bg-amber-800 text-white font-bold">
-                        <td className="sticky left-0 z-10 bg-amber-800 py-2 px-3 border-r border-amber-700">PAGAMENTOS / CUSTOS</td>
+                        <td className="sticky left-0 z-10 bg-amber-800 py-2 px-3 border-r border-amber-700">
+                          <div className="flex items-center justify-between gap-2">
+                            <span>PAGAMENTOS / CUSTOS</span>
+                            <button
+                              onClick={() => setShowAddCat(!showAddCat)}
+                              className="px-2 py-0.5 text-[10px] bg-amber-950/60 hover:bg-amber-950 text-amber-100 rounded flex items-center gap-0.5"
+                              title="Adicionar nova linha de custo"
+                            >
+                              <PlusIcon className="w-3 h-3" /> Custo
+                            </button>
+                          </div>
+                        </td>
                         {editions.map(ed => <td key={ed.id} className="py-2 px-2 text-center font-mono text-[11px] border-r border-amber-700">{ed.label}</td>)}
                       </tr>
 
-                      {EXPENSE_ROWS.map(row => (
-                        <tr key={row.cat} className="bg-rose-50/30 dark:bg-rose-950/10">
-                          <td className="sticky left-0 z-10 bg-white dark:bg-neutral-900 py-2 px-3 font-medium border-r border-slate-200 dark:border-neutral-800">{row.label}</td>
+                      {showAddCat && (
+                        <tr className="bg-amber-50 dark:bg-amber-950/30">
+                          <td colSpan={editions.length + 1} className="py-2 px-3">
+                            <form onSubmit={handleAddCostRow} className="flex items-center gap-2 max-w-md">
+                              <input
+                                type="text"
+                                placeholder="Nome do novo custo (ex: Limpeza, Divulgação)..."
+                                value={newCatLabel}
+                                onChange={e => setNewCatLabel(e.target.value)}
+                                autoFocus
+                                className="flex-1 px-2.5 py-1 text-xs bg-white dark:bg-neutral-900 border border-amber-400 rounded"
+                              />
+                              <button type="submit" className="px-3 py-1 text-xs font-semibold bg-emerald-600 text-white rounded">Adicionar</button>
+                              <button type="button" onClick={() => setShowAddCat(false)} className="px-2 py-1 text-xs text-slate-500">Cancelar</button>
+                            </form>
+                          </td>
+                        </tr>
+                      )}
+
+                      {expenseCats.map(row => (
+                        <tr key={row.id} className="bg-rose-50/30 dark:bg-rose-950/10 group">
+                          <td className="sticky left-0 z-10 bg-white dark:bg-neutral-900 py-2 px-3 font-medium border-r border-slate-200 dark:border-neutral-800 max-w-[210px]">
+                            {editingCatId === row.id ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={inlineCatLabel}
+                                  onChange={e => setInlineCatLabel(e.target.value)}
+                                  onKeyDown={e => e.key === 'Enter' && handleSaveCatLabel(row.id)}
+                                  autoFocus
+                                  className="w-full px-1.5 py-0.5 text-xs bg-slate-50 dark:bg-neutral-800 border border-emerald-500 rounded"
+                                />
+                                <button onClick={() => handleSaveCatLabel(row.id)} className="text-emerald-500"><CheckIcon className="w-3.5 h-3.5" /></button>
+                                <button onClick={() => setEditingCatId(null)} className="text-slate-400"><XIcon className="w-3.5 h-3.5" /></button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-between gap-1">
+                                <span
+                                  onClick={() => { setEditingCatId(row.id); setInlineCatLabel(row.label); }}
+                                  className="truncate cursor-pointer hover:text-rose-600 dark:hover:text-rose-400"
+                                  title="Clique para renomear custo"
+                                >
+                                  {row.label}
+                                </span>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                  <button onClick={() => { setEditingCatId(row.id); setInlineCatLabel(row.label); }} className="text-slate-400 hover:text-emerald-500" title="Renomear">
+                                    <PencilIcon className="w-3 h-3" />
+                                  </button>
+                                  <button onClick={() => handleDeleteCostRow(row)} className="text-slate-400 hover:text-rose-500" title="Excluir linha de custo">
+                                    <TrashIcon className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </td>
                           {editions.map(ed => {
                             if (ed.status === 'cancelada') return <td key={ed.id} className="bg-rose-600 text-white text-center font-bold text-[10px] py-2 px-1 border-r border-rose-500">CANCELADO</td>;
-                            const ex = orgExpenses.find(item => item.editionId === ed.id && item.category === row.cat);
+                            const ex = orgExpenses.find(item => item.editionId === ed.id && item.category === row.id);
                             return (
                               <td key={ed.id} onClick={() => openExpCell(ed, row)} className="py-2 px-1.5 text-center font-mono text-rose-900 dark:text-rose-300 border-r border-slate-200 dark:border-neutral-800 cursor-pointer hover:bg-rose-100/60 dark:hover:bg-rose-900/30">
                                 {ex && ex.amount > 0 ? formatCurrency(ex.amount) : 'R$ 0,00'}
@@ -625,13 +758,13 @@
               </div>
             )}
 
-            {/* TAB: COBRANÇAS PENDENTES */}
+            {/* TAB: COBRANÇAS PENDENTES (PUXADO DA GERAL + FEIRANTES) */}
             {tab === 'reports' && (
               <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm">
                 <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-neutral-800">
                   <div>
                     <h2 className="text-base font-bold">Relatório de Pendentes para Cobrança</h2>
-                    <p className="text-xs text-slate-500 dark:text-neutral-400">Lista consolidada de feirantes com pagamento pendente</p>
+                    <p className="text-xs text-slate-500 dark:text-neutral-400">Puxado automaticamente das células marcadas como Pendente na planilha Geral e contatos de Feirantes</p>
                   </div>
                   <div className="px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-mono text-xs font-bold">
                     Total Pendente: {formatCurrency(totalPending)}
@@ -650,10 +783,19 @@
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-neutral-800">
-                      {pendingItems.map(({ participation, edition, feirante }) => (
+                      {pendingItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-slate-500 dark:text-neutral-400">
+                            Nenhuma célula marcada como Pendente na planilha Geral.
+                          </td>
+                        </tr>
+                      ) : pendingItems.map(({ participation, edition, feirante }) => (
                         <tr key={participation.id}>
                           <td className="py-3 px-3 font-mono font-semibold">{edition.label}</td>
-                          <td className="py-3 px-3 font-bold">{feirante.name}</td>
+                          <td className="py-3 px-3">
+                            <div className="font-bold">{feirante.name}</div>
+                            {feirante.stallType && <div className="text-[11px] text-slate-500 dark:text-neutral-400">{feirante.stallType}</div>}
+                          </td>
                           <td className="py-3 px-3">
                             {editingPhoneId === feirante.id ? (
                               <div className="flex items-center gap-1">
@@ -715,7 +857,7 @@
                         <div className="text-xs font-mono mt-2">Taxa: {formatCurrency(f.defaultFee)} · {f.phone || 'Sem telefone'}</div>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => { setEditingFr(f); setFrName(f.name); setFrStall(f.stallType); setFrPhone(f.phone || ''); setFrFee(String(f.defaultFee)); setShowFrModal(true); }} className="p-1.5 text-slate-400 hover:text-white"><PencilIcon className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { setEditingFr(f); setFrName(f.name); setFrStall(f.stallType); setFrPhone(f.phone || ''); setFrFee(String(f.defaultFee)); setShowFrModal(true); }} className="p-1.5 text-slate-400 hover:text-emerald-500"><PencilIcon className="w-3.5 h-3.5" /></button>
                         <button onClick={() => { if (confirm(`Excluir ${f.name}?`)) { saveFeirantes(feirantes.filter(x => x.id !== f.id)); saveParticipations(participations.filter(p => p.feiranteId !== f.id)); } }} className="p-1.5 text-slate-400 hover:text-rose-600"><TrashIcon className="w-3.5 h-3.5" /></button>
                       </div>
                     </div>
@@ -724,56 +866,64 @@
               </div>
             )}
 
-            {/* TAB: GRÁFICOS & CUSTOS */}
+            {/* TAB: GRÁFICOS & CUSTOS (PUXADO DA GERAL) */}
             {tab === 'charts' && (
-              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm space-y-6">
-                <h2 className="text-base font-bold">Recebimentos vs. Pagamentos por Edição</h2>
-                <div className="h-60 flex items-end justify-between gap-2 pt-6 border-b border-slate-100 dark:border-neutral-800">
-                  {[...realizedEditions].reverse().map(ed => {
-                    const rec = participations.filter(p => p.editionId === ed.id && (p.status === 'pago_pix' || p.status === 'pago_dinheiro')).reduce((s, p) => s + p.amount, 0);
-                    const exp = orgExpenses.filter(e => e.editionId === ed.id).reduce((s, e) => s + e.amount, 0);
-                    const max = 1800;
-                    return (
-                      <div key={ed.id} className="flex-1 flex flex-col items-center h-full justify-end group relative">
-                        <div className="w-full flex items-end justify-center gap-1 h-44">
-                          <div style={{ height: `${Math.min(100, (rec / max) * 100)}%` }} className="w-1/2 max-w-[22px] bg-emerald-500 rounded-t-sm" title={`Recebido: ${formatCurrency(rec)}`} />
-                          <div style={{ height: `${Math.min(100, (exp / max) * 100)}%` }} className="w-1/2 max-w-[22px] bg-rose-500 rounded-t-sm" title={`Pago: ${formatCurrency(exp)}`} />
-                        </div>
-                        <span className="mt-2 text-[10px] font-mono text-slate-500 dark:text-neutral-400">{ed.label.slice(0, 5)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* TAB: BACKUP & PIN */}
-            {tab === 'backup' && (
-              <div className="bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-base font-bold">Backup Local & Segurança por PIN</h2>
-                    <p className="text-xs text-slate-500 dark:text-neutral-400">Exporte seus dados em arquivo .JSON ou proteja o acesso com senha numérica</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={handleDownloadBackup} className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-emerald-600 text-white rounded-lg"><DownloadIcon className="w-3.5 h-3.5" /> Baixar Backup (.JSON)</button>
-                    <label className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-slate-100 dark:bg-neutral-800 rounded-lg cursor-pointer"><UploadIcon className="w-3.5 h-3.5" /> Restaurar Backup<input type="file" accept=".json" onChange={handleRestoreBackup} className="hidden" /></label>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 dark:border-neutral-800 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-bold">Bloqueio por PIN: {vaultPin ? 'Ativado' : 'Desativado'}</div>
-                    <div className="text-xs text-slate-500 dark:text-neutral-400">Exige senha numérica ao abrir o arquivo</div>
-                  </div>
-                  {vaultPin ? (
-                    <button onClick={() => { localStorage.removeItem(KEYS.PIN); setVaultPin(''); }} className="px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 dark:bg-rose-950/40 rounded-lg">Remover PIN</button>
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <input type="password" maxLength={6} placeholder="PIN (4-6 dígitos)" value={newPinInput} onChange={e => setNewPinInput(e.target.value.replace(/\D/g, ''))} className="px-3 py-1.5 text-xs font-mono bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 rounded-lg" />
-                      <button onClick={() => { if (newPinInput.length >= 4) { localStorage.setItem(KEYS.PIN, newPinInput); setVaultPin(newPinInput); setNewPinInput(''); } }} className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded-lg">Ativar PIN</button>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="lg:col-span-7 bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-base font-bold">Recebimentos vs. Pagamentos por Edição</h2>
+                      <p className="text-xs text-slate-500 dark:text-neutral-400">Dados consolidados diretamente da planilha Geral</p>
                     </div>
-                  )}
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Recebido</span>
+                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span> Pago</span>
+                    </div>
+                  </div>
+                  <div className="h-60 flex items-end justify-between gap-2 pt-6 border-b border-slate-100 dark:border-neutral-800">
+                    {[...realizedEditions].reverse().map(ed => {
+                      const rec = participations.filter(p => p.editionId === ed.id && (p.status === 'pago_pix' || p.status === 'pago_dinheiro')).reduce((s, p) => s + p.amount, 0);
+                      const exp = orgExpenses.filter(e => e.editionId === ed.id).reduce((s, e) => s + e.amount, 0);
+                      const max = 1800;
+                      return (
+                        <div key={ed.id} className="flex-1 flex flex-col items-center h-full justify-end group relative">
+                          <div className="w-full flex items-end justify-center gap-1 h-44">
+                            <div style={{ height: `${Math.min(100, (rec / max) * 100)}%` }} className="w-1/2 max-w-[22px] bg-emerald-500 rounded-t-sm" title={`Recebido: ${formatCurrency(rec)}`} />
+                            <div style={{ height: `${Math.min(100, (exp / max) * 100)}%` }} className="w-1/2 max-w-[22px] bg-rose-500 rounded-t-sm" title={`Pago: ${formatCurrency(exp)}`} />
+                          </div>
+                          <span className="mt-2 text-[10px] font-mono text-slate-500 dark:text-neutral-400">{ed.label.slice(0, 5)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 bg-white dark:bg-neutral-900 rounded-xl border border-slate-200 dark:border-neutral-800 p-6 shadow-sm space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-base font-bold">Custos por Categoria (Geral)</h2>
+                      <p className="text-xs text-slate-500 dark:text-neutral-400">Total pago: {formatCurrency(totalOrgExpensesAll)}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3.5">
+                    {categoryTotals.map(cat => {
+                      const pct = totalOrgExpensesAll > 0 ? Math.round((cat.total / totalOrgExpensesAll) * 100) : 0;
+                      return (
+                        <div key={cat.id} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: cat.color }}></span>
+                              {cat.label}
+                            </span>
+                            <span className="font-mono font-bold">{formatCurrency(cat.total)} <span className="text-slate-400 font-normal">({pct}%)</span></span>
+                          </div>
+                          <div className="w-full h-2 bg-slate-100 dark:bg-neutral-800 rounded-full overflow-hidden">
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: cat.color }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
