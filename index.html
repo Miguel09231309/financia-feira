@@ -15,7 +15,15 @@
   </head>
   <body class="bg-slate-50 dark:bg-black text-slate-900 dark:text-neutral-100 antialiased font-sans min-h-screen selection:bg-emerald-500 selection:text-white">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      window.__feiraBooted = false;
+      function __fallbackToDocs() {
+        if (!window.__feiraBooted && !location.pathname.includes('/docs/')) {
+          location.replace('./docs/index.html');
+        }
+      }
+    </script>
+    <script type="module" src="/src/main.tsx" onerror="__fallbackToDocs()"></script>
   </body>
 </html>
 
